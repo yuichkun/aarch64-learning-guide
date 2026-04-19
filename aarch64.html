@@ -1,0 +1,4217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AArch64 — A Field Manual for Apple Silicon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Sans+JP:wght@300;400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Zen+Old+Mincho:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0d0b09;
+    --parchment: #12100d;
+    --surface: #1a1612;
+    --surface-2: #221d17;
+    --surface-3: #2a241d;
+    --rule: #3a3026;
+    --rule-soft: #2c241c;
+    --text: #e8dfcf;
+    --text-dim: #b8ad98;
+    --text-faint: #7d7362;
+    --amber: #d4a054;
+    --amber-bright: #f2b860;
+    --amber-deep: #9c7538;
+    --teal: #8ab0a8;
+    --crimson: #c16450;
+    --violet: #9d7fb5;
+    --green: #8fa968;
+    --serif: 'Fraunces', 'Zen Old Mincho', serif;
+    --serif-jp: 'Zen Old Mincho', 'Fraunces', serif;
+    --sans: 'IBM Plex Sans', 'IBM Plex Sans JP', -apple-system, sans-serif;
+    --mono: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
+    --grain-opacity: 0.04;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--sans);
+    font-weight: 400;
+    color: var(--text);
+    background: var(--ink);
+    line-height: 1.7;
+    font-size: 15px;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* film grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity: var(--grain-opacity);
+    pointer-events: none;
+    z-index: 1000;
+    mix-blend-mode: overlay;
+  }
+
+  /* warm radial atmosphere */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(212, 160, 84, 0.06), transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(138, 176, 168, 0.04), transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* typography base */
+  h1, h2, h3, h4 {
+    font-family: var(--serif);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  h1 { font-size: clamp(2.8rem, 6vw, 5.5rem); line-height: 1; font-weight: 300; }
+  h2 { font-size: clamp(1.8rem, 3.5vw, 2.6rem); line-height: 1.1; font-weight: 400; }
+  h3 { font-size: 1.35rem; line-height: 1.3; font-weight: 500; }
+  h4 { font-size: 1.1rem; line-height: 1.3; font-weight: 500; font-family: var(--sans); text-transform: uppercase; letter-spacing: 0.12em; color: var(--amber); }
+
+  p { margin-bottom: 1em; color: var(--text-dim); }
+  p strong { color: var(--text); font-weight: 600; }
+  em { font-style: italic; color: var(--amber-bright); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: var(--surface-2);
+    padding: 0.12em 0.4em;
+    border: 1px solid var(--rule-soft);
+    border-radius: 2px;
+    color: var(--amber-bright);
+  }
+
+  a {
+    color: var(--amber);
+    text-decoration: none;
+    border-bottom: 1px solid var(--amber-deep);
+    transition: color 0.2s, border-color 0.2s;
+  }
+  a:hover { color: var(--amber-bright); border-color: var(--amber-bright); }
+
+  /* ================= LAYOUT ================= */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  .rail {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  section {
+    padding: 5rem 0;
+    position: relative;
+  }
+
+  section + section {
+    border-top: 1px solid var(--rule-soft);
+  }
+
+  /* ================= HEADER / HERO ================= */
+  .hero {
+    min-height: 95vh;
+    display: flex;
+    align-items: center;
+    position: relative;
+    padding: 4rem 0;
+    overflow: hidden;
+  }
+
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--rule-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--rule-soft) 1px, transparent 1px);
+    background-size: 80px 80px;
+    mask-image: radial-gradient(ellipse at 30% 40%, black 0%, transparent 70%);
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .hero-inner {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+  }
+
+  .hero-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 3rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--text-faint);
+  }
+
+  .hero-meta-left { display: flex; gap: 2rem; }
+  .hero-meta .label { color: var(--amber); }
+
+  .hero-title {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-style: italic;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero-title .emph {
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  .hero-title .small {
+    display: block;
+    font-size: 0.35em;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    margin-top: 0.5em;
+    font-family: var(--sans);
+    font-weight: 300;
+    font-style: normal;
+  }
+
+  .hero-sub {
+    max-width: 620px;
+    font-size: 1.1rem;
+    line-height: 1.7;
+    margin-top: 2rem;
+  }
+
+  .hero-binary {
+    position: absolute;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--amber-deep);
+    opacity: 0.3;
+    line-height: 1.5;
+    user-select: none;
+    pointer-events: none;
+    white-space: pre;
+  }
+
+  .hero-binary.tr {
+    top: 8%;
+    right: 3%;
+    text-align: right;
+  }
+  .hero-binary.bl {
+    bottom: 10%;
+    left: 3%;
+  }
+
+  /* ================= SECTION HEADING ================= */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: var(--amber);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .section-label::before {
+    content: '';
+    width: 3rem;
+    height: 1px;
+    background: var(--amber);
+  }
+
+  .section-title {
+    margin-bottom: 2.5rem;
+    max-width: 900px;
+  }
+
+  .section-title .deco {
+    font-family: var(--serif);
+    font-style: italic;
+    color: var(--amber);
+    font-weight: 300;
+  }
+
+  /* ================= NAV ================= */
+  .nav {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    z-index: 100;
+    background: rgba(26, 22, 18, 0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 0.75rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+  }
+
+  .nav ol {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    counter-reset: navc;
+  }
+
+  .nav a {
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+  .nav a::before {
+    counter-increment: navc;
+    content: counter(navc, decimal-leading-zero);
+    color: var(--amber-deep);
+  }
+  .nav a:hover { color: var(--amber-bright); }
+
+  @media (max-width: 900px) { .nav { display: none; } }
+
+  /* ================= ENV SETUP ================= */
+  .setup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+  @media (max-width: 800px) { .setup-grid { grid-template-columns: 1fr; } }
+
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 1.75rem;
+    position: relative;
+  }
+
+  .setup-card .corner {
+    position: absolute;
+    top: -1px; right: -1px;
+    width: 20px; height: 20px;
+    border-top: 2px solid var(--amber);
+    border-right: 2px solid var(--amber);
+  }
+
+  .setup-card h3 {
+    font-family: var(--serif);
+    margin-bottom: 0.5rem;
+  }
+
+  .setup-card .step {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.5rem;
+  }
+
+  /* ================= CODE BLOCK ================= */
+  .code {
+    background: var(--parchment);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--amber);
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    line-height: 1.65;
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    position: relative;
+    color: var(--text);
+    white-space: pre;
+    margin: 1rem 0;
+  }
+
+  .code-wrap { position: relative; margin: 1rem 0; }
+  .code-wrap .code { margin: 0; }
+
+  .copy-btn {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    padding: 0.35rem 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 2;
+  }
+  .copy-btn:hover { color: var(--amber-bright); border-color: var(--amber); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+  .code .c { color: var(--text-faint); font-style: italic; }  /* comment */
+  .code .k { color: var(--amber-bright); }                     /* keyword/instruction */
+  .code .r { color: var(--teal); }                             /* register */
+  .code .n { color: var(--violet); }                           /* number */
+  .code .s { color: var(--green); }                            /* string */
+  .code .l { color: var(--crimson); }                          /* label */
+  .code .d { color: var(--amber); }                            /* directive */
+  /* C-specific */
+  .code .ct { color: var(--crimson); }                         /* C type (int, long, void) */
+  .code .cw { color: var(--amber-bright); }                    /* C keyword (return, if, for) */
+  .code .cp { color: var(--violet); }                          /* C preprocessor (#include) */
+  .code .ch { color: var(--green); }                           /* C header name <stdio.h> */
+  .code .cf { color: var(--teal); }                            /* C function name */
+  .code .co { color: var(--amber); }                           /* C operator */
+
+  /* ================= APPROACH CARDS ================= */
+  .approaches {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+  @media (max-width: 900px) { .approaches { grid-template-columns: 1fr; } }
+
+  .approach {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 1.5rem;
+    position: relative;
+    transition: transform 0.3s, border-color 0.3s;
+  }
+  .approach:hover { transform: translateY(-3px); border-color: var(--amber); }
+
+  .approach .mark {
+    font-family: var(--serif);
+    font-size: 3rem;
+    line-height: 1;
+    color: var(--amber);
+    font-weight: 300;
+    font-style: italic;
+    margin-bottom: 0.5rem;
+  }
+  .approach.recommended::after {
+    content: 'RECOMMENDED';
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--amber-bright);
+    background: rgba(212, 160, 84, 0.1);
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--amber-deep);
+  }
+
+  .approach h4 {
+    color: var(--text);
+    font-family: var(--serif);
+    font-size: 1.15rem;
+    letter-spacing: 0;
+    text-transform: none;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+  }
+
+  .approach p { font-size: 0.9rem; margin-bottom: 0; }
+
+  /* ================= REGISTER TABLE ================= */
+  .reg-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+  @media (max-width: 900px) { .reg-layout { grid-template-columns: 1fr; } }
+
+  .reg-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+  }
+  @media (max-width: 600px) { .reg-grid { grid-template-columns: repeat(4, 1fr); } }
+
+  .reg-cell {
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    padding: 0.7rem 0.4rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+  }
+  .reg-cell:hover { background: var(--surface-2); border-color: var(--amber); }
+  .reg-cell.active { background: var(--surface-3); border-color: var(--amber-bright); }
+  .reg-cell .name { color: var(--amber-bright); font-weight: 500; font-size: 0.85rem; display: block; }
+  .reg-cell .role { color: var(--text-faint); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.15rem; }
+  .reg-cell[data-kind="special"] { border-color: var(--amber-deep); }
+  .reg-cell[data-kind="special"] .name { color: var(--crimson); }
+
+  .reg-detail {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 1.5rem;
+    position: sticky;
+    top: 2rem;
+    min-height: 200px;
+  }
+  .reg-detail h4 {
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    color: var(--amber-bright);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .reg-detail .subtitle {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 1rem;
+  }
+  .reg-detail p { font-size: 0.88rem; }
+
+  /* ================= INSTRUCTION REFERENCE ================= */
+  .inst-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--rule);
+    margin-top: 2rem;
+    margin-bottom: 0;
+    flex-wrap: wrap;
+  }
+  .inst-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .inst-tab:hover { color: var(--text); }
+  .inst-tab.active { color: var(--amber-bright); border-bottom-color: var(--amber); }
+
+  .inst-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+  }
+  .inst-table th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    font-weight: 500;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--amber);
+  }
+  .inst-table td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+  .inst-table tr:hover td { background: var(--surface); }
+  .inst-table .mnem { color: var(--amber-bright); font-weight: 500; }
+  .inst-table .desc { color: var(--text-dim); font-family: var(--sans); font-size: 0.88rem; }
+  .inst-table .syn { color: var(--teal); font-size: 0.8rem; }
+
+  .inst-panel { display: none; padding: 0.5rem 0; }
+  .inst-panel.active { display: block; }
+
+  /* ================= SAMPLE TABS ================= */
+  .sample-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .sample-tab {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    padding: 0.65rem 1.2rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .sample-tab:hover { color: var(--text); border-color: var(--text-faint); }
+  .sample-tab.active { background: var(--surface-3); color: var(--amber-bright); border-color: var(--amber); }
+
+  .sample { display: none; }
+  .sample.active { display: block; }
+  .sample h4 { margin-top: 2rem; margin-bottom: 0.75rem; }
+  .sample h4:first-child { margin-top: 0; }
+
+  /* ================= SIMULATOR ================= */
+  .sim-wrap {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    margin-top: 2rem;
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background: var(--parchment);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+
+  .sim-header .dots { display: flex; gap: 0.4rem; }
+  .sim-header .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--rule); }
+  .sim-header .dot.live { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+
+  .sim-layout {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    min-height: 520px;
+  }
+  @media (max-width: 900px) { .sim-layout { grid-template-columns: 1fr; } }
+
+  .sim-editor-col {
+    border-right: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+  }
+  @media (max-width: 900px) {
+    .sim-editor-col { border-right: none; border-bottom: 1px solid var(--rule); }
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--rule-soft);
+    background: var(--surface-2);
+    flex-wrap: wrap;
+  }
+
+  .sim-btn {
+    background: var(--surface-3);
+    border: 1px solid var(--rule);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 0.4rem 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sim-btn:hover { border-color: var(--amber); color: var(--amber-bright); }
+  .sim-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .sim-btn.primary { background: var(--amber-deep); color: var(--ink); border-color: var(--amber); }
+  .sim-btn.primary:hover { background: var(--amber); color: var(--ink); }
+
+  .sim-sel {
+    background: var(--surface-3);
+    border: 1px solid var(--rule);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+  }
+
+  .sim-editor {
+    flex: 1;
+    background: var(--parchment);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    line-height: 1.65;
+    padding: 1rem 1.25rem;
+    border: none;
+    outline: none;
+    resize: vertical;
+    tab-size: 4;
+    white-space: pre;
+    min-height: 320px;
+    caret-color: var(--amber-bright);
+  }
+  .sim-editor:focus { background: #100d0a; }
+
+  .sim-viewer {
+    position: relative;
+    background: var(--parchment);
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    line-height: 1.65;
+    padding: 1rem 1.25rem;
+    overflow: auto;
+    white-space: pre;
+    min-height: 320px;
+    flex: 1;
+  }
+  .sim-viewer .line {
+    display: block;
+    padding-left: 2.2rem;
+    position: relative;
+    border-radius: 1px;
+  }
+  .sim-viewer .line .gutter {
+    position: absolute;
+    left: 0;
+    width: 1.9rem;
+    text-align: right;
+    color: var(--text-faint);
+    font-size: 0.75rem;
+    padding-right: 0.5rem;
+  }
+  .sim-viewer .line.current {
+    background: rgba(212, 160, 84, 0.12);
+    box-shadow: inset 2px 0 0 var(--amber-bright);
+  }
+  .sim-viewer .line.executed { color: var(--text-dim); }
+  .sim-viewer .line.error { background: rgba(193, 100, 80, 0.15); box-shadow: inset 2px 0 0 var(--crimson); }
+
+  .sim-state {
+    display: flex;
+    flex-direction: column;
+    background: var(--ink);
+  }
+
+  .sim-state-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .sim-state-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.75rem 0.5rem;
+    cursor: pointer;
+  }
+  .sim-state-tab.active { color: var(--amber-bright); border-bottom-color: var(--amber); }
+
+  .sim-state-panel {
+    flex: 1;
+    padding: 1rem;
+    overflow: auto;
+    display: none;
+  }
+  .sim-state-panel.active { display: block; }
+
+  .reg-row {
+    display: grid;
+    grid-template-columns: 3.5rem 1fr auto;
+    gap: 0.75rem;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 2px;
+    align-items: baseline;
+  }
+  .reg-row .rn { color: var(--teal); font-weight: 500; }
+  .reg-row .rv { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+  .reg-row .rd { color: var(--text-faint); font-size: 0.72rem; }
+  .reg-row.changed { background: rgba(212, 160, 84, 0.15); }
+  .reg-row.changed .rv { color: var(--amber-bright); }
+
+  .result-banner {
+    background: linear-gradient(90deg, rgba(212, 160, 84, 0.18), rgba(212, 160, 84, 0.04));
+    border: 1px solid var(--amber-deep);
+    border-left: 3px solid var(--amber-bright);
+    padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+    font-family: var(--mono);
+  }
+  .result-banner .rb-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+  }
+  .result-banner .rb-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .result-banner .rb-reg {
+    color: var(--teal);
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .result-banner .rb-dec {
+    color: var(--amber-bright);
+    font-size: 1.5rem;
+    font-weight: 500;
+    font-family: var(--serif);
+    letter-spacing: 0.02em;
+  }
+  .result-banner .rb-hex {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+  }
+  .result-banner.idle {
+    background: none;
+    border-color: var(--rule);
+    border-left-color: var(--rule);
+  }
+  .result-banner.idle .rb-label { color: var(--text-faint); }
+  .result-banner.idle .rb-dec { color: var(--text-faint); font-style: italic; font-size: 0.95rem; }
+  .result-banner.idle .rb-hex { display: none; }
+
+  .flags-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin: 0.5rem 0 1rem;
+    font-family: var(--mono);
+  }
+  .flag {
+    text-align: center;
+    padding: 0.5rem;
+    background: var(--surface-2);
+    border: 1px solid var(--rule-soft);
+    border-radius: 2px;
+  }
+  .flag .fn { color: var(--text-faint); font-size: 0.65rem; letter-spacing: 0.2em; }
+  .flag .fv { color: var(--text); font-size: 1.2rem; font-weight: 500; margin-top: 0.15rem; }
+  .flag.set { border-color: var(--amber); }
+  .flag.set .fv { color: var(--amber-bright); }
+
+  .sim-console {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    padding: 0.75rem 1.25rem;
+    background: #0a0806;
+    border-top: 1px solid var(--rule-soft);
+    min-height: 1.5rem;
+    max-height: 6rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+  .sim-console .ok { color: var(--green); }
+  .sim-console .err { color: var(--crimson); }
+  .sim-console .info { color: var(--amber); }
+
+  .mem-row {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    padding: 0.15rem 0.5rem;
+    gap: 0.5rem;
+  }
+  .mem-row .maddr { color: var(--teal); }
+  .mem-row .mval { color: var(--text); }
+  .mem-empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: 1rem 0.5rem;
+    font-family: var(--sans);
+    font-size: 0.85rem;
+  }
+
+  /* ================= ANNOTATED CODE (line-by-line explanation) ================= */
+  .annotated {
+    background: var(--parchment);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--amber);
+    margin: 1.5rem 0;
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    line-height: 1.65;
+    overflow: hidden;
+  }
+  .ann-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--surface-2);
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--rule);
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  .ann-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .ann-row:last-child { border-bottom: none; }
+  .ann-row .ann-code {
+    padding: 0.75rem 1.25rem;
+    color: var(--text);
+    white-space: pre;
+    overflow-x: auto;
+    border-right: 1px solid var(--rule-soft);
+    background: var(--parchment);
+  }
+  .ann-row .ann-note {
+    padding: 0.85rem 1.25rem;
+    color: var(--text-dim);
+    font-family: var(--sans);
+    font-size: 0.88rem;
+    line-height: 1.65;
+    background: var(--surface);
+  }
+  .ann-row.comment .ann-code { color: var(--text-faint); font-style: italic; }
+  .ann-row.blank .ann-code { padding: 0.3rem 1.25rem; }
+  .ann-row.blank .ann-note { padding: 0.3rem 1.25rem; background: var(--surface); }
+  .ann-row .ann-note strong { color: var(--text); }
+  .ann-row .ann-note code { font-size: 0.82em; background: var(--surface-2); }
+  .ann-row:hover .ann-code { background: #161310; }
+  .ann-row:hover .ann-note { background: var(--surface-2); }
+
+  @media (max-width: 800px) {
+    .ann-row { grid-template-columns: 1fr; }
+    .ann-row .ann-code { border-right: none; border-bottom: 1px solid var(--rule-soft); }
+  }
+
+  /* section hint text */
+  .hint {
+    font-size: 0.95rem;
+    color: var(--text-dim);
+    margin: 1.25rem 0;
+    line-height: 1.75;
+  }
+  .hint strong { color: var(--text); }
+
+  /* prose sections (body text inside h4 sub-sections) */
+  .prose { max-width: 780px; margin: 1rem 0 2rem; }
+  .prose p { margin-bottom: 1em; }
+  .prose p:last-child { margin-bottom: 0; }
+
+  /* concept diagram */
+  .concept {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+  .concept .label {
+    font-family: var(--sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.5rem;
+  }
+
+  /* ============ Proper (non-ASCII) diagrams ============ */
+  .diagram-wrap {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 1.75rem;
+    margin: 2rem 0;
+  }
+  .diagram-title {
+    font-family: var(--sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 1.25rem;
+  }
+  .diagram-2col {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 2rem;
+    align-items: start;
+  }
+  @media (max-width: 800px) { .diagram-2col { grid-template-columns: 1fr; } }
+  .diagram-col-label {
+    font-family: var(--sans);
+    font-size: 0.68rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  /* Register visualization (bl _puts state) */
+  .reg-vis-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .reg-vis-row {
+    display: grid;
+    grid-template-columns: 3rem 1.5rem 1fr;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--parchment);
+    border: 1px solid var(--rule-soft);
+    border-radius: 2px;
+  }
+  .reg-vis-row.highlight {
+    border-color: var(--amber);
+    background: rgba(212, 160, 84, 0.08);
+  }
+  .reg-vis-name {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    color: var(--teal);
+    font-weight: 500;
+  }
+  .reg-vis-row.highlight .reg-vis-name { color: var(--amber-bright); }
+  .reg-vis-arrow {
+    position: relative;
+    height: 2px;
+    background: var(--rule);
+    margin-right: 0.5rem;
+  }
+  .reg-vis-arrow::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: -3px;
+    border-left: 6px solid var(--amber-deep);
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+  }
+  .reg-vis-row.highlight .reg-vis-arrow { background: var(--amber-deep); }
+  .reg-vis-row.highlight .reg-vis-arrow::after { border-left-color: var(--amber); }
+  .reg-vis-val-main {
+    font-family: var(--sans);
+    font-size: 0.88rem;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  .reg-vis-val-sub {
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    color: var(--text-faint);
+    margin-top: 0.15rem;
+  }
+
+  /* Stack visualization */
+  .stack-vis {
+    display: flex;
+    flex-direction: column;
+    font-family: var(--mono);
+  }
+  .stack-addr-label {
+    font-family: var(--sans);
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    padding: 0.3rem 0.5rem;
+  }
+  .stack-addr-label.top { text-align: right; }
+  .stack-addr-label.bottom { text-align: right; padding-top: 0.5rem; }
+  .stack-frame {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--rule);
+    background: var(--parchment);
+    position: relative;
+  }
+  .stack-cell {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 0.85rem;
+    font-size: 0.8rem;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .stack-cell:last-child { border-bottom: none; }
+  .stack-cell.old { color: var(--text-faint); font-style: italic; background: transparent; }
+  .stack-cell.saved {
+    background: rgba(212, 160, 84, 0.08);
+    color: var(--text);
+  }
+  .stack-cell.free { color: var(--text-faint); font-style: italic; background: transparent; }
+  .stack-cell-size {
+    color: var(--text-faint);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+  }
+  .stack-sp-marker {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0.85rem;
+    background: var(--amber-deep);
+    color: var(--ink);
+    font-size: 0.78rem;
+    font-weight: 500;
+    font-family: var(--mono);
+  }
+  .stack-sp-note {
+    font-size: 0.7rem;
+    font-weight: 400;
+    opacity: 0.85;
+  }
+
+  /* XW register SVG diagram */
+  .xw-diagram svg {
+    width: 100%;
+    height: auto;
+    max-width: 720px;
+    display: block;
+    margin: 0 auto 1.5rem;
+  }
+  .xw-notes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  @media (max-width: 800px) { .xw-notes { grid-template-columns: 1fr; } }
+  .xw-note {
+    background: var(--parchment);
+    border: 1px solid var(--rule-soft);
+    border-top: 2px solid var(--amber-deep);
+    padding: 0.85rem 1rem;
+  }
+  .xw-note-head {
+    font-family: var(--sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.5rem;
+  }
+  .xw-note p {
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin: 0;
+    color: var(--text-dim);
+  }
+
+  /* Instruction anatomy SVG */
+  .inst-anatomy {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    align-items: center;
+  }
+  .inst-anatomy svg {
+    width: 100%;
+    height: auto;
+    max-width: 760px;
+    display: block;
+    margin: 0 auto;
+  }
+  .inst-anatomy-note {
+    font-family: var(--sans);
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .inst-anatomy-note p {
+    font-size: 0.88rem;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+  }
+  .inst-anatomy-note p:last-child { margin-bottom: 0; }
+
+  /* term / definition table */
+  .deflist {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    gap: 0 2rem;
+    margin: 1.5rem 0;
+  }
+  .deflist dt {
+    font-family: var(--mono);
+    color: var(--amber-bright);
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    font-size: 0.9rem;
+  }
+  .deflist dd {
+    color: var(--text-dim);
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    font-size: 0.93rem;
+    line-height: 1.65;
+  }
+  @media (max-width: 700px) {
+    .deflist { grid-template-columns: 1fr; gap: 0; }
+    .deflist dt { border-bottom: none; padding-bottom: 0; }
+    .deflist dd { padding-top: 0.25rem; padding-left: 1rem; }
+  }
+
+  /* ============ Bit-width visualization ============ */
+  /* Single-bit introduction */
+  .bit-single {
+    margin: 1.25rem 0 1.5rem;
+  }
+  .bit-single-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .bit-cell-big {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 7rem;
+    height: 5rem;
+    border: 1px solid var(--rule);
+    background: var(--parchment);
+    border-radius: 2px;
+    padding: 0.5rem;
+  }
+  .bit-cell-big.off { color: var(--text-faint); }
+  .bit-cell-big.on {
+    background: rgba(212, 160, 84, 0.18);
+    border-color: var(--amber);
+    color: var(--amber-bright);
+    box-shadow: 0 0 18px rgba(212, 160, 84, 0.15);
+  }
+  .bit-cell-big .bit-val {
+    font-family: var(--mono);
+    font-size: 2rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .bit-cell-big .bit-note {
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    margin-top: 0.4rem;
+    color: var(--text-faint);
+    text-align: center;
+  }
+  .bit-cell-big.on .bit-note { color: var(--amber); }
+  .bit-or {
+    font-family: var(--serif);
+    font-style: italic;
+    color: var(--text-faint);
+    font-size: 0.95rem;
+  }
+  .bit-single-caption {
+    text-align: center;
+    font-family: var(--sans);
+    font-size: 0.82rem;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+  }
+
+  .bitbox-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    margin: 1.5rem 0;
+  }
+  .bitbox-row {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr 10rem;
+    gap: 1rem;
+    align-items: center;
+    font-family: var(--mono);
+  }
+  @media (max-width: 700px) {
+    .bitbox-row { grid-template-columns: 1fr; gap: 0.35rem; }
+  }
+  .bitbox-label {
+    font-size: 0.8rem;
+    color: var(--amber-bright);
+    font-weight: 500;
+  }
+  .bitbox-cells {
+    display: flex;
+    gap: 2px;
+    background: var(--parchment);
+    padding: 3px;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+  }
+  .bitbox-cells .cell {
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
+    padding: 0.35rem 0;
+    font-size: 0.75rem;
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+  .bitbox-cells .cell.on { background: rgba(212, 160, 84, 0.3); color: var(--amber-bright); }
+  .bitbox-cells .cell.ellipsis {
+    flex: 2 1 0;
+    background: transparent;
+    color: var(--text-faint);
+    font-style: italic;
+    font-size: 0.72rem;
+    border-left: 1px dashed var(--rule);
+    border-right: 1px dashed var(--rule);
+  }
+  .bitbox-capacity {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    text-align: right;
+  }
+  .bitbox-capacity strong { color: var(--text); font-weight: 500; }
+  @media (max-width: 700px) { .bitbox-capacity { text-align: left; } }
+
+  /* ============ Alignment visualization ============ */
+  .align-vis {
+    background: var(--parchment);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 1.25rem;
+    margin: 1.5rem 0;
+    overflow-x: auto;
+  }
+  .align-vis-title {
+    font-family: var(--sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.85rem;
+  }
+  .align-ruler {
+    display: grid;
+    grid-template-columns: repeat(16, minmax(2rem, 1fr));
+    gap: 2px;
+    font-family: var(--mono);
+    min-width: 560px;
+  }
+  .align-ruler .addr {
+    text-align: center;
+    font-size: 0.68rem;
+    color: var(--text-faint);
+    padding-bottom: 0.25rem;
+  }
+  .align-ruler .addr.mark4 { color: var(--amber); font-weight: 600; }
+  .align-byte {
+    height: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    border-radius: 1px;
+  }
+  .align-byte.boundary { border-left: 2px solid var(--amber); }
+  .align-group-ok, .align-group-bad {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+    font-family: var(--sans);
+    font-size: 0.82rem;
+  }
+  .align-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+  }
+  .align-badge.ok { background: rgba(143, 169, 104, 0.18); color: var(--green); border: 1px solid var(--green); }
+  .align-badge.bad { background: rgba(193, 100, 80, 0.15); color: var(--crimson); border: 1px solid var(--crimson); }
+  .align-bracket {
+    display: grid;
+    grid-template-columns: repeat(16, minmax(2rem, 1fr));
+    gap: 2px;
+    margin-top: 0.35rem;
+    min-width: 560px;
+  }
+  .align-bracket .slot { height: 1.25rem; position: relative; }
+  .align-bracket .slot.inst {
+    grid-column: span 4;
+    background: rgba(212, 160, 84, 0.15);
+    border: 1px solid var(--amber);
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--amber-bright);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .align-bracket .slot.inst.misaligned {
+    background: rgba(193, 100, 80, 0.15);
+    border-color: var(--crimson);
+    color: var(--crimson);
+  }
+  .align-bracket .slot.inst.offset1 { grid-column: 2 / span 4; }
+
+  /* ============ Exercises ============ */
+  .ex-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+  .ex-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--amber);
+    padding: 1.5rem 1.75rem;
+    position: relative;
+  }
+  .ex-card .ex-num {
+    position: absolute;
+    top: -0.75rem;
+    left: 1.25rem;
+    background: var(--ink);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    color: var(--amber);
+    padding: 0.15rem 0.75rem;
+    border: 1px solid var(--amber-deep);
+    border-radius: 2px;
+    text-transform: uppercase;
+  }
+  .ex-card .ex-difficulty {
+    position: absolute;
+    top: -0.75rem;
+    right: 1.25rem;
+    background: var(--ink);
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    color: var(--text-faint);
+    padding: 0.15rem 0.65rem;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+  }
+  .ex-card .ex-difficulty.d1 { color: var(--green); border-color: var(--green); }
+  .ex-card .ex-difficulty.d2 { color: var(--teal); border-color: var(--teal); }
+  .ex-card .ex-difficulty.d3 { color: var(--amber); border-color: var(--amber); }
+  .ex-card .ex-difficulty.d4 { color: var(--crimson); border-color: var(--crimson); }
+  .ex-card h3 {
+    font-family: var(--serif);
+    font-size: 1.3rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    margin-top: 0.35rem;
+    color: var(--text);
+  }
+  .ex-card .ex-body {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    margin-top: 0.75rem;
+  }
+  .ex-card .ex-body p { margin-bottom: 0.5em; }
+  .ex-card .ex-body p:last-child { margin-bottom: 0; }
+
+  .ex-hint {
+    background: rgba(138, 176, 168, 0.08);
+    border: 1px dashed var(--teal);
+    border-radius: 2px;
+    padding: 0.8rem 1rem;
+    margin-top: 1rem;
+    font-size: 0.88rem;
+    color: var(--text-dim);
+  }
+  .ex-hint .hint-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--teal);
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+
+  .ex-solution {
+    margin-top: 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .ex-solution summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.7rem 1rem;
+    background: var(--surface-2);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.15em;
+    color: var(--amber);
+    text-transform: uppercase;
+    list-style: none;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .ex-solution summary::-webkit-details-marker { display: none; }
+  .ex-solution summary:hover { background: var(--surface-3); }
+  .ex-solution summary::after {
+    content: '▸ クリックで開く';
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    letter-spacing: 0.12em;
+  }
+  .ex-solution[open] summary::after { content: '▾ 閉じる'; color: var(--amber); }
+  .ex-solution-body {
+    padding: 1rem 1.25rem 1.25rem;
+    background: var(--parchment);
+  }
+  .ex-solution-body h4 {
+    font-family: var(--sans);
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin: 1rem 0 0.4rem;
+  }
+  .ex-solution-body h4:first-child { margin-top: 0; }
+  .ex-solution-body .code { margin: 0.35rem 0; }
+  .ex-solution-body .ex-explain {
+    font-family: var(--sans);
+    font-size: 0.88rem;
+    color: var(--text-dim);
+    line-height: 1.65;
+    margin-top: 0.6rem;
+  }
+  .ex-solution-body .ex-explain strong { color: var(--text); }
+
+  /* ================= FOOTER ================= */
+  footer {
+    padding: 4rem 0 5rem;
+    border-top: 1px solid var(--rule);
+    background: var(--parchment);
+    text-align: center;
+  }
+  footer .colophon {
+    font-family: var(--serif);
+    font-style: italic;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+  }
+  footer .meta {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  /* entrance animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero-title { animation: fadeUp 1s ease 0.1s both; }
+  .hero-sub { animation: fadeUp 1s ease 0.35s both; }
+  .hero-meta { animation: fadeUp 1s ease 0.55s both; }
+
+  /* scroll reveal */
+  .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.8s, transform 0.8s; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* callout */
+  .callout {
+    border-left: 2px solid var(--amber);
+    background: var(--surface);
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+    font-size: 0.95rem;
+  }
+  .callout .lead {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.35rem;
+  }
+
+  /* Ornament */
+  .ornament {
+    text-align: center;
+    font-family: var(--serif);
+    color: var(--amber);
+    font-size: 1.5rem;
+    letter-spacing: 0.5em;
+    padding: 2rem 0;
+  }
+
+  /* Prose list (when lists truly help) */
+  ul.field-list {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+  }
+  ul.field-list li {
+    padding: 0.5rem 0 0.5rem 1.5rem;
+    border-bottom: 1px solid var(--rule-soft);
+    position: relative;
+    color: var(--text-dim);
+  }
+  ul.field-list li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--amber);
+    font-family: var(--mono);
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="目次">
+  <ol>
+    <li><a href="#opening">序</a></li>
+    <li><a href="#setup">環境構築</a></li>
+    <li><a href="#approaches">3つのアプローチ</a></li>
+    <li><a href="#registers">レジスタ</a></li>
+    <li><a href="#instructions">命令</a></li>
+    <li><a href="#dissection">Hello 解剖</a></li>
+    <li><a href="#samples">ハンズオン</a></li>
+    <li><a href="#simulator">シミュレータ</a></li>
+    <li><a href="#exercises">練習問題</a></li>
+  </ol>
+</nav>
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div class="hero-grid"></div>
+  <pre class="hero-binary tr">10101010 00000011
+11010010 10000000
+00000000 00000000
+01010100 00000000
+11010110 01011111
+00000011 11000000</pre>
+  <pre class="hero-binary bl">d2800020  mov x0, #1
+d2800181  mov x1, #12
+d28000a2  mov x2, #5
+d4001001  svc #0x80
+d65f03c0  ret</pre>
+
+  <div class="container hero-inner">
+    <div class="hero-meta">
+      <div class="hero-meta-left">
+        <span><span class="label">ISA</span> AArch64 / ARMv8-A</span>
+        <span><span class="label">TARGET</span> Apple Silicon</span>
+        <span><span class="label">ABI</span> Darwin</span>
+      </div>
+      <span>Rev. 2026.04</span>
+    </div>
+
+    <h1 class="hero-title">
+      A Field Manual<br>
+      for <em class="emph">AArch64</em><br>
+      on Apple Silicon
+      <span class="small">—— M1 のための、機械語とその手触り</span>
+    </h1>
+
+    <p class="hero-sub">
+      本書は M1 / M2 / M3 世代の Apple Silicon で、AArch64 の機械語を
+      実際に書き、組み立て、走らせ、逆アセンブルして読むための一冊の手引きである。
+      追加インストールは最小、掲載されるコードはすべてコピーすればターミナルで動く。
+      読者は自分の指で <code>mov</code> と書き、CPU の中で何が起きているかを確かめる。
+    </p>
+  </div>
+</header>
+
+<!-- ================= OPENING ================= -->
+<section id="opening">
+  <div class="rail">
+    <div class="section-label">序</div>
+    <h2 class="section-title">
+      機械語を「見る」のではなく<br>
+      <span class="deco">組み立てる</span>ために
+    </h2>
+    <p>
+      機械語はしばしば「0 と 1 の並び」と説明される。それは正しいが、
+      書いて、走らせて、逆アセンブルしない限り、手触りは決して得られない。
+      本書は概念を繰り返し説明する代わりに、<strong>M1 の実機の上で動く最小のプログラム</strong>
+      を起点に据える。
+    </p>
+
+    <h3 style="margin-top: 2.5rem;">読む前に、語彙の地図</h3>
+    <p>
+      これから何度も出てくる言葉を、先にひとまとめにしておく。厳密な定義ではなく、
+      読み進めるための目印として使ってほしい。
+    </p>
+
+    <dl class="deflist">
+      <dt>AArch64</dt>
+      <dd>64ビット実行状態の ARM アーキテクチャ。ARM64 と呼ばれることも多い。iPhone 5s 以降・M1 以降の Mac・多くのサーバで使われている命令セット。</dd>
+
+      <dt>ISA</dt>
+      <dd>Instruction Set Architecture。CPU が理解する命令の種類と書式の仕様。AArch64 はひとつの ISA。</dd>
+
+      <dt>命令 (instruction)</dt>
+      <dd>AArch64 ではすべての命令が<strong>正確に 4 バイト (32 ビット)</strong>に収まる固定長。x86 のように可変長ではない。例えば <code>add x0, x0, x1</code> という 1 行は 32 ビットの数値にエンコードされる。</dd>
+
+      <dt>ニーモニック</dt>
+      <dd>命令を覚えやすい短い単語で表したもの (<code>mov</code>, <code>add</code>, <code>ret</code> など)。アセンブラがこれを数値のバイト列に変換する。</dd>
+
+      <dt>レジスタ</dt>
+      <dd>CPU 内部の超高速な記憶枠。AArch64 には 64 ビット幅のものが 31 本 (<code>X0</code>〜<code>X30</code>) + 特殊なもの数本。計算はほぼすべてレジスタ同士で行う。</dd>
+
+      <dt>即値 (immediate)</dt>
+      <dd>命令の中に直接埋め込まれた定数。<code>#</code> を付けて書く。例: <code>mov x0, #42</code> の <code>#42</code>。</dd>
+
+      <dt>メモリ</dt>
+      <dd>レジスタ外の大きな記憶領域。<code>ldr</code> (load) で読み込み、<code>str</code> (store) で書き込む。AArch64 はレジスタとメモリ間の移動しか命令で行えない (Load/Store アーキテクチャ)。</dd>
+
+      <dt>アセンブラ</dt>
+      <dd><code>.s</code> に書かれた人間向けのニーモニックを、CPU が食うバイト列 (<code>.o</code>) に変換するツール。macOS では <code>as</code>、あるいは <code>clang</code> が裏で呼ぶ。</dd>
+
+      <dt>リンカ</dt>
+      <dd>複数の <code>.o</code> を一つの実行ファイルにまとめるツール。<code>_printf</code> のような外部関数の実体 (libc) を繋ぐのもリンカの仕事。</dd>
+
+      <dt>ABI</dt>
+      <dd>Application Binary Interface。関数呼び出しでどのレジスタに引数を入れ、どこに戻り値を置くか、スタックをどう揃えるか、といった取り決め。AArch64 には AAPCS64 という標準があり、Apple はそれに独自拡張を加えた Darwin ABI を使う。</dd>
+    </dl>
+
+    <h3 style="margin-top: 2.5rem;">ビットとバイト、そして「幅」</h3>
+
+    <p>
+      上の定義で「64 ビット幅」「32 ビット」という言葉が何度も出てきた。ここで一度、その中身を作っておく。これが分からないと以降の全ての話が宙に浮く。
+    </p>
+
+    <h4 style="margin-top: 1.5rem; color: var(--text); font-family: var(--serif); font-size: 1.1rem; text-transform: none; letter-spacing: 0; font-weight: 500;">ビット — 最小の記憶</h4>
+
+    <p>
+      コンピュータの内部には無数の小さな電子回路がある。そのひとつひとつは、電気が<strong>流れている</strong>か<strong>流れていない</strong>かの二つの状態しか取れない。この 2 択の状態を記録できる一番小さな場所を <strong>「1 ビット」</strong>と呼ぶ。
+    </p>
+
+    <p>
+      電気が流れていない状態を <code>0</code>、流れている状態を <code>1</code> と書くと決めたのが、現代のコンピュータが 0 と 1 だけで全てを表現している理由。電球 1 個に点灯・消灯の 2 状態があるのと同じで、<strong>1 ビット単独では「2 通りのうちどちら?」しか表せない</strong>。
+    </p>
+
+    <div class="bit-single">
+      <div class="bit-single-row">
+        <div class="bit-cell-big off"><span class="bit-val">0</span><span class="bit-note">電気が流れていない</span></div>
+        <div class="bit-or">または</div>
+        <div class="bit-cell-big on"><span class="bit-val">1</span><span class="bit-note">電気が流れている</span></div>
+      </div>
+      <div class="bit-single-caption">1 ビット = 2 通りの状態を区別できる</div>
+    </div>
+
+    <h4 style="margin-top: 2rem; color: var(--text); font-family: var(--serif); font-size: 1.1rem; text-transform: none; letter-spacing: 0; font-weight: 500;">複数のビットを横に並べると、表現できる幅が広がる</h4>
+
+    <p>
+      1 ビットだけでは 2 通りしか表せない。でも、<strong>2 ビットを横に並べて一組として扱う</strong>と、
+      <code>00 / 01 / 10 / 11</code> の <strong>4 通り</strong>を区別できる。3 ビットなら 8 通り、4 ビットなら 16 通り。
+      ビット 1 本増えるたびに、表現できる状態数が倍になっていく。
+    </p>
+
+    <p>
+      こうして <strong>「何ビットを一組として扱うか」</strong>を決めると、その組でいくつの違うものを区別できるかが決まる。
+      この「<strong>一組にするビットの本数</strong>」のことを <strong>ビット幅 (bit width)</strong> と呼ぶ。
+      「幅」と言うのは、ビットを横一列に並べて眺めたときの<em>列の長さ</em>をイメージしているから。
+    </p>
+
+    <p>
+      たとえば <strong>8 ビット幅</strong>なら、<code>00000000</code> から <code>11111111</code> までの <strong>2<sup>8</sup> = 256 通り</strong> を区別できる。
+      この 256 という数は、ちょうど以下のような「1 つの塊で扱いたいもの」を 1 個分収めるのに都合が良い:
+    </p>
+
+    <ul class="field-list">
+      <li>アルファベットや記号 1 文字 (ASCII では全部で 128 種類、収まる)</li>
+      <li>0〜255 の小さな整数 1 個</li>
+      <li>画像のピクセル 1 つ分の明るさ (真っ暗 0 〜 最大 255)</li>
+    </ul>
+
+    <p>
+      だから、ちょうど「<strong>何か 1 つを扱うのに使いやすいビット数</strong>」として 8 ビットが選ばれた。
+      この 8 ビットという単位に、歴史的経緯から <strong>バイト (byte)</strong> という別名が付いた。
+      以降、<strong>1 バイト = 8 ビット</strong>と覚えておけばよい。
+    </p>
+
+    <h4 style="margin-top: 2rem; color: var(--text); font-family: var(--serif); font-size: 1.1rem; text-transform: none; letter-spacing: 0; font-weight: 500;">もっと大きな値を扱いたければ、もっと幅を広げる</h4>
+
+    <p>
+      1 バイト (8 ビット) では 256 通りしか表せないので、大きな数や複雑なものは扱えない。
+      そこで用途に応じて、16 ビット・32 ビット・64 ビットという広い幅をまとめて一組として扱う。
+      下の図は、ビット幅と「区別できる状態の数」の対応を視覚的に並べたもの。
+      色付きのマスが <code>1</code>、灰色が <code>0</code>。
+    </p>
+
+    <div class="bitbox-stack">
+      <div class="bitbox-row">
+        <div class="bitbox-label">8 bit</div>
+        <div class="bitbox-cells">
+          <div class="cell">0</div><div class="cell on">1</div><div class="cell">0</div><div class="cell on">1</div>
+          <div class="cell">0</div><div class="cell">0</div><div class="cell on">1</div><div class="cell">0</div>
+        </div>
+        <div class="bitbox-capacity">2<sup>8</sup> = <strong>256 通り</strong></div>
+      </div>
+      <div class="bitbox-row">
+        <div class="bitbox-label">16 bit</div>
+        <div class="bitbox-cells">
+          <div class="cell">0</div><div class="cell">0</div><div class="cell on">1</div><div class="cell">0</div>
+          <div class="cell on">1</div><div class="cell">0</div><div class="cell">0</div><div class="cell on">1</div>
+          <div class="cell">0</div><div class="cell on">1</div><div class="cell">0</div><div class="cell">0</div>
+          <div class="cell on">1</div><div class="cell on">1</div><div class="cell">0</div><div class="cell on">1</div>
+        </div>
+        <div class="bitbox-capacity">2<sup>16</sup> = <strong>65,536 通り</strong></div>
+      </div>
+      <div class="bitbox-row">
+        <div class="bitbox-label">32 bit</div>
+        <div class="bitbox-cells">
+          <div class="cell">0</div><div class="cell on">1</div><div class="cell">0</div><div class="cell on">1</div>
+          <div class="cell ellipsis">… 32 個 …</div>
+          <div class="cell">0</div><div class="cell">0</div><div class="cell on">1</div><div class="cell">0</div>
+        </div>
+        <div class="bitbox-capacity">2<sup>32</sup> ≈ <strong>約 42 億通り</strong></div>
+      </div>
+      <div class="bitbox-row">
+        <div class="bitbox-label">64 bit</div>
+        <div class="bitbox-cells">
+          <div class="cell">0</div><div class="cell on">1</div><div class="cell">0</div><div class="cell on">1</div>
+          <div class="cell ellipsis">… 64 個 …</div>
+          <div class="cell">0</div><div class="cell on">1</div><div class="cell">0</div><div class="cell on">1</div>
+        </div>
+        <div class="bitbox-capacity">2<sup>64</sup> ≈ <strong>約 1844 京通り</strong></div>
+      </div>
+    </div>
+
+    <p>
+      32 ビットもあれば約 42 億種類のものを区別できる。そして <strong>64 ビットあれば約 1844 京通り</strong> で、実用上は<em>まずサイズが足りなくなることのない</em>大きさが扱える。AArch64 が「64 ビット」を名乗っているのは、CPU の内部で値を扱う基本単位がこの <strong>64 ビット幅</strong>だから、という意味。
+    </p>
+
+    <p>
+      この先「ビット幅」という言葉が出てきたら、<strong>「何本のビットをひとまとめに扱うか」</strong>と読み替えればよい。
+      「X レジスタは 64 ビット幅」というのは、<em>後の章で登場する</em> X レジスタという部品が、64 本のビットを一組として扱える場所だ、という意味にすぎない。
+    </p>
+
+    <h3 style="margin-top: 2.5rem;">本書の流儀</h3>
+    <p>
+      扱うのは AArch64 (別名 ARM64、ARMv8-A の 64bit 実行状態)。
+      iPhone 5s 以降の Apple 製 SoC と、M1 以降の Mac はすべてこの ISA で動いている。
+    </p>
+    <p>
+      本書は読者が <strong>3 通りの「機械語の呼び方」</strong> を区別できるようになることを目標とする。
+      すなわち、<em>libc を呼ぶアセンブリ</em> (本筋)、
+      <em>C の出力としてのアセンブリ</em> (比較対象)、
+      <em>syscall を直接叩くアセンブリ</em> (補助) の三つ。
+    </p>
+    <p>
+      コードは <strong>すべて「何をしているか」を 1 行ずつ説明</strong> する。
+      「動いた」で終わらせず、「なぜ動くか」に必ず立ち戻る。
+    </p>
+  </div>
+</section>
+
+<!-- ================= SETUP ================= -->
+<section id="setup">
+  <div class="container">
+    <div class="section-label">第一章 · 環境構築</div>
+    <h2 class="section-title">
+      準備はおそらく<br>
+      <span class="deco">すでに済んでいる</span>
+    </h2>
+    <p style="max-width: 760px;">
+      macOS で AArch64 アセンブリを扱うのに必要な道具はすべて Xcode Command Line Tools に含まれる。
+      アセンブラの <code>as</code>、リンカの <code>ld</code>、コンパイラの <code>clang</code>、
+      逆アセンブラの <code>otool</code> と <code>objdump</code>、デバッガの <code>lldb</code> ——
+      これら一式が一度のインストールで揃う。Homebrew も Xcode 本体も不要である。
+    </p>
+
+    <div class="setup-grid">
+      <div class="setup-card">
+        <div class="corner"></div>
+        <div class="step">Step 01</div>
+        <h3>Command Line Tools を入れる</h3>
+        <p>
+          以下を一度だけ実行する。すでに入っていれば「already installed」と表示される。
+        </p>
+        <div class="code-wrap">
+          <button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c"># Xcode CLT 一式（as, ld, clang, otool, lldb）</span>
+xcode-select --install</pre>
+        </div>
+      </div>
+
+      <div class="setup-card">
+        <div class="corner"></div>
+        <div class="step">Step 02</div>
+        <h3>揃っているか確認する</h3>
+        <p>
+          すべて M1 ネイティブで動く。arm64 の <code>arch</code> が返れば合格である。
+        </p>
+        <div class="code-wrap">
+          <button class="copy-btn" data-copy>Copy</button>
+<pre class="code">arch          <span class="c"># → arm64</span>
+as --version  <span class="c"># → Apple clang version ...</span>
+clang --version
+otool --version</pre>
+        </div>
+      </div>
+
+      <div class="setup-card">
+        <div class="corner"></div>
+        <div class="step">Step 03</div>
+        <h3>作業用ディレクトリを掘る</h3>
+        <p>
+          散らからないよう専用の場所を用意しておくとよい。
+          以降、この場所を作業の起点とする。
+        </p>
+        <div class="code-wrap">
+          <button class="copy-btn" data-copy>Copy</button>
+<pre class="code">mkdir -p ~/aarch64-lab
+cd ~/aarch64-lab</pre>
+        </div>
+      </div>
+
+      <div class="setup-card">
+        <div class="corner"></div>
+        <div class="step">Step 04</div>
+        <h3>Hello, Silicon — 動作確認</h3>
+        <p>
+          下のコマンドを一括で流す。<code>Hello, Silicon</code> と表示されれば環境は整っている。
+          <strong>このコード自体の逐行解説は、必要な語彙 (レジスタ・命令) を揃えた後の<a href="#dissection" style="color: var(--amber);">第五章</a>で行う。</strong>いまは動くことだけ確認すれば十分。
+        </p>
+        <div class="code-wrap">
+          <button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c"># asm を書いて、組み立てて、リンクして、走らせる</span>
+cat &gt; hello.s &lt;&lt;'EOF'
+.global _main
+.align 2
+_main:
+    stp   x29, x30, [sp, #-16]!
+    adrp  x0, msg@PAGE
+    add   x0, x0, msg@PAGEOFF
+    bl    _puts
+    mov   w0, #0
+    ldp   x29, x30, [sp], #16
+    ret
+.data
+msg: .asciz "Hello, Silicon"
+EOF
+clang -o hello hello.s
+./hello</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= APPROACHES ================= -->
+<section id="approaches">
+  <div class="container">
+    <div class="section-label">第二章 · 三つのアプローチ</div>
+    <h2 class="section-title">
+      同じ「Hello」でも<br>
+      <span class="deco">書き方は三通り</span>ある
+    </h2>
+    <p style="max-width: 760px;">
+      同じ出力を得るのに、機械語への降り方は複数ある。本書では以下の三つを使い分ける。
+      基本は <strong>方針 B（libc を呼ぶ）</strong> で進め、
+      コンパイラの出力を見るための <strong>方針 C</strong> を並走、
+      OS の境界を覗くときのみ <strong>方針 A（syscall）</strong> に降りる。
+    </p>
+
+    <div class="approaches">
+      <article class="approach recommended">
+        <div class="mark">B</div>
+        <h4>アセンブリから libc を呼ぶ</h4>
+        <p>
+          自分で書いたアセンブリが <code>puts</code>、<code>printf</code>、
+          <code>malloc</code> を呼ぶ方式。Apple がこれを推奨しており、
+          書ける範囲が広く、教材も豊富。本書の主軸。
+        </p>
+      </article>
+
+      <article class="approach recommended">
+        <div class="mark">C</div>
+        <h4>C を書いて asm 出力を見る</h4>
+        <p>
+          <code>clang -S</code> や <code>clang -O2 -S</code> で、
+          C コードがどんな AArch64 に落ちるかを観察する方式。
+          自分で書いた asm との比較で、最適化や呼び出し規約が一気に理解できる。
+        </p>
+      </article>
+
+      <article class="approach">
+        <div class="mark">A</div>
+        <h4>syscall を直接叩く</h4>
+        <p>
+          <code>svc #0x80</code> で Darwin のシステムコールを直接呼ぶ最低レベル方式。
+          libc を介さない分、OS の境界が露出する。本書では補助として紹介する。
+        </p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= REGISTERS ================= -->
+<section id="registers">
+  <div class="container">
+    <div class="section-label">第三章 · レジスタ早見表</div>
+    <h2 class="section-title">
+      31 本の汎用レジスタと<br>
+      <span class="deco">特別な数本</span>
+    </h2>
+
+    <div class="prose">
+      <h3 style="margin-top: 0;">そもそもレジスタとは何か</h3>
+      <p>
+        これまで <code>X0</code> や <code>W0</code> といった名前が何度も出てきたが、ここで一度ちゃんと定義する。
+        レジスタとは、<strong>CPU のチップ内部に埋め込まれた、非常に小さくて非常に速い記憶枠</strong>のこと。
+        メモリ (RAM) がチップの<em>外</em>にある広大な倉庫だとすれば、レジスタは CPU の作業机の上に最初から置かれている引き出しに近い。
+      </p>
+      <p>
+        CPU は原則として、メモリ上の値を直接計算することはできない。
+        足し算一つするにも、まず <strong>メモリからレジスタへ値を読み出す → レジスタ同士で計算 → 結果をメモリへ書き戻す</strong>、という手順を踏む。
+        この「計算の一時待機所」がレジスタで、数が多いほど、そして速いほど CPU の仕事が速くなる。
+      </p>
+      <p>
+        ただし、レジスタは非常に高価な部品なので、<strong>本数はごく少ない</strong>。
+        AArch64 では 31 本 + 特殊なもの数本。これを ABI のルールに従って使い回していく。
+      </p>
+
+      <h3 style="margin-top: 2rem;">レジスタ 1 本分のサイズ = 64 ビット幅</h3>
+      <p>
+        前章で扱った「ビット幅」の話がここで効いてくる。
+        <strong>AArch64 のレジスタ 1 本は 64 ビット幅</strong> ── つまり、0 と 1 を 64 個分記録できる箱が 1 本。
+        この箱の中に、64 ビットで表現された任意の値 (約 1844 京通りのうちのどれか) を 1 つ格納できる。
+      </p>
+      <p>
+        本章ではこの 31 本のレジスタの名前と役割を眺めていく。
+        まず、1 本のレジスタに<strong>2 つの呼び名</strong>があるという話から始める。
+      </p>
+    </div>
+
+    <h3 style="margin-top: 2rem;">同じレジスタ、2 つの名前 — X と W</h3>
+    <p>
+      AArch64 のレジスタは 64 ビット幅だが、時には <strong>下位 32 ビットだけ</strong>を扱いたい場面がある。
+      たとえば C の <code>int</code> 型は 32 ビット幅なので、64 ビット全部を使う必要がない。
+      そこで、同じ 1 本のレジスタに対して <strong>2 通りの呼び方</strong>が用意されている:
+    </p>
+
+    <ul class="field-list">
+      <li><strong>X0, X1, … X30</strong> — 64 ビット全体を指す呼び方 (X は 64bit extended の X)</li>
+      <li><strong>W0, W1, … W30</strong> — 下位 32 ビットだけを指す呼び方 (W は 32bit word の W)</li>
+    </ul>
+
+    <p>
+      <code>X0</code> と <code>W0</code> は<strong>同じ物理レジスタ</strong>の、扱う幅だけが違う呼び方。
+      別々のレジスタではない。
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">X レジスタと W レジスタの関係</div>
+      <div class="xw-diagram">
+        <svg viewBox="0 0 700 180" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="X レジスタと W レジスタの関係図">
+          <defs>
+            <linearGradient id="xgrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#2a241d"/>
+              <stop offset="100%" stop-color="#1a1612"/>
+            </linearGradient>
+            <linearGradient id="wgrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#d4a054" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#d4a054" stop-opacity="0.12"/>
+            </linearGradient>
+          </defs>
+
+          <!-- bit ruler -->
+          <g font-family="IBM Plex Mono, monospace" font-size="10" fill="#7d7362">
+            <text x="40"  y="22" text-anchor="middle">63</text>
+            <text x="355" y="22" text-anchor="end">32</text>
+            <text x="375" y="22" text-anchor="start">31</text>
+            <text x="680" y="22" text-anchor="middle">0</text>
+          </g>
+
+          <!-- X register outer box (64 bit) -->
+          <rect x="40" y="32" width="640" height="56"
+                fill="url(#xgrad)" stroke="#3a3026" stroke-width="1.5" rx="2"/>
+
+          <!-- W register inner highlight (lower 32 bit) -->
+          <rect x="362" y="34" width="316" height="52"
+                fill="url(#wgrad)" stroke="#d4a054" stroke-width="1.5" rx="2"/>
+
+          <!-- separator at bit 32 -->
+          <line x1="362" y1="32" x2="362" y2="88" stroke="#d4a054" stroke-width="1.5" stroke-dasharray="3,3"/>
+
+          <!-- Upper 32 bits label -->
+          <g font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#b8ad98">
+            <text x="201" y="64" text-anchor="middle">上位 32 ビット</text>
+            <text x="201" y="80" text-anchor="middle" font-size="10" fill="#7d7362">(W に書くとゼロクリア)</text>
+          </g>
+
+          <!-- Lower 32 bits label -->
+          <g font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#f2b860">
+            <text x="520" y="66" text-anchor="middle" font-weight="600">下位 32 ビット</text>
+          </g>
+
+          <!-- X0 label (full) — bracket with centered label pill -->
+          <g>
+            <line x1="40" y1="110" x2="40" y2="118" stroke="#8ab0a8" stroke-width="1"/>
+            <line x1="680" y1="110" x2="680" y2="118" stroke="#8ab0a8" stroke-width="1"/>
+            <line x1="40" y1="114" x2="315" y2="114" stroke="#8ab0a8" stroke-width="1"/>
+            <line x1="405" y1="114" x2="680" y2="114" stroke="#8ab0a8" stroke-width="1"/>
+            <text x="360" y="118" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" fill="#8ab0a8" font-weight="500">X0 · 64 bit</text>
+          </g>
+
+          <!-- W0 label (lower half) — bracket with centered label pill -->
+          <g>
+            <line x1="362" y1="138" x2="362" y2="146" stroke="#f2b860" stroke-width="1"/>
+            <line x1="678" y1="138" x2="678" y2="146" stroke="#f2b860" stroke-width="1"/>
+            <line x1="362" y1="142" x2="475" y2="142" stroke="#f2b860" stroke-width="1"/>
+            <line x1="565" y1="142" x2="678" y2="142" stroke="#f2b860" stroke-width="1"/>
+            <text x="520" y="146" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" fill="#f2b860" font-weight="500">W0 · 32 bit</text>
+          </g>
+        </svg>
+
+        <div class="xw-notes">
+          <div class="xw-note">
+            <div class="xw-note-head">物理的には 1 本</div>
+            <p><code>X0</code> と <code>W0</code> は同じ箱の呼び方違い。<code>W</code> レジスタに書き込むと、<strong>上位 32 ビットは自動的にゼロクリア</strong>される。</p>
+          </div>
+          <div class="xw-note">
+            <div class="xw-note-head">書くときの使い分け</div>
+            <p>扱いたい値が 32 ビット以内に収まるなら <code>W</code>、それ以上なら <code>X</code>。上位 32 ビットを使わないなら <code>W</code> で十分。</p>
+          </div>
+          <div class="xw-note">
+            <div class="xw-note-head">例</div>
+            <pre style="margin:0;font-size:0.82rem;line-height:1.7;"><span style="color:var(--amber-bright)">mov</span> <span style="color:var(--teal)">w0</span>, <span style="color:var(--violet)">#42</span>    <span style="color:var(--text-faint)">→ X0 全体が 0x00000000_0000002A</span>
+<span style="color:var(--amber-bright)">add</span> <span style="color:var(--teal)">w0</span>, <span style="color:var(--teal)">w0</span>, <span style="color:var(--teal)">w1</span> <span style="color:var(--text-faint)">→ 32bit 加算、上位は 0 に</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 2.5rem;">C の型との対応 — なぜ <code>main</code> の <code>return 0;</code> で <code>w0</code> なのか</h3>
+    <p>
+      「ビット幅」と「X/W レジスタ」が揃ったところで、これまで保留してきた疑問に答えられる。
+      C で書かれた関数の戻り値は、その型のビット幅に応じて <strong>X か W のどちらかで返す</strong>ことになっている。
+      型のビット幅と使うレジスタの対応はこうなる:
+    </p>
+
+    <dl class="deflist">
+      <dt>char</dt>
+      <dd>8 ビット幅 = 1 バイト。<code>W</code> レジスタの下位 8 ビット部分だけ使う。</dd>
+      <dt>short</dt>
+      <dd>16 ビット幅 = 2 バイト。<code>W</code> レジスタの下位 16 ビット部分を使う。</dd>
+      <dt>int</dt>
+      <dd>32 ビット幅 = 4 バイト。<code>W</code> レジスタをちょうど満たすサイズ。<strong>だから <code>int</code> を返す関数は <code>w0</code> を使う</strong>。</dd>
+      <dt>long / ポインタ</dt>
+      <dd>64 ビット幅 = 8 バイト (macOS・Linux の場合)。<code>X</code> レジスタをちょうど満たすサイズ。<strong>だから <code>long</code> や ポインタを返すときは <code>x0</code>。</strong></dd>
+    </dl>
+
+    <p>
+      これが、第一章の Hello, Silicon で <code>mov w0, #0</code> と書いた理由。
+      C の <code>main()</code> の戻り値型は <code>int</code> (32 ビット) なので、レジスタの 64 ビット全部ではなく下位 32 ビット分にあたる <code>w0</code> に書き込む ── これが流儀。
+    </p>
+
+    <h3 style="margin-top: 2.5rem;">誰が何を保存する責任を持つか</h3>
+    <p>
+      関数呼び出しをまたいでレジスタの値を守るのは、呼び出す側か、呼ばれる側か。
+      これを <strong>「保存責任 (save convention)」</strong>と呼び、ABI で決まっている。
+    </p>
+
+    <div class="deflist">
+      <dt>Caller-saved</dt>
+      <dd><strong>呼び出す側の責任</strong>。X0〜X18 の多く。関数を呼ぶ前に、残しておきたい値は自分でスタックに退避する。呼ばれた側は自由に書き換えてよい。<strong>引数と戻り値、一時変数に向く</strong>。</dd>
+
+      <dt>Callee-saved</dt>
+      <dd><strong>呼ばれた側の責任</strong>。X19〜X28 の 10 本。関数内で使うならプロローグで退避、エピローグで復元する義務がある。<strong>呼び出しをまたいで保持したい値に向く</strong>。自分がループ内で何度も関数を呼ぶなら、こちらに値を入れる。</dd>
+
+      <dt>特殊</dt>
+      <dd>X29 (FP) と X30 (LR) はフレームポインタとリンクレジスタ。X18 は Apple が予約済み (OS が使う) で<strong>触ってはいけない</strong>。SP はスタックポインタで、常に 16 バイト境界に揃える必要がある。</dd>
+    </div>
+
+    <p class="hint">
+      以下のグリッドは X0 から X30 と特殊レジスタの配置を示している。<strong>セルをクリック</strong>すると右に詳しい説明が出る。
+      実務では X0〜X7 (引数)、X29/X30 (フレーム)、X19〜X28 (呼び出しまたぎの保管庫) を覚えれば大体足りる。
+    </p>
+
+    <div class="reg-layout">
+      <div class="reg-grid" id="reg-grid"></div>
+      <aside class="reg-detail" id="reg-detail">
+        <h4>X0</h4>
+        <div class="subtitle">General Purpose · Argument 0 / Return Value</div>
+        <p>
+          汎用レジスタの 0 番。呼び出し規約 (AAPCS64) では第 1 引数と戻り値に使われる。
+          C 関数の <code>printf(fmt, ...)</code> を呼ぶときは <code>X0</code> に第 1 引数（フォーマット文字列のアドレス）を置く。
+          Darwin では syscall の第 1 引数兼戻り値としても使われる。
+        </p>
+      </aside>
+    </div>
+
+    <h3 style="margin-top: 3rem;">フラグ (NZCV)</h3>
+    <p>
+      通常のレジスタとは別に、<strong>4 ビットの「条件フラグ」</strong>がある。<code>cmp</code> や <code>adds</code> などの命令で更新され、条件分岐命令 <code>b.eq</code> / <code>b.gt</code> などがこれを見て飛ぶかどうかを決める。
+    </p>
+
+    <div class="deflist">
+      <dt>N (Negative)</dt>
+      <dd>結果が負 (最上位ビットが 1) なら 1。</dd>
+      <dt>Z (Zero)</dt>
+      <dd>結果がちょうど 0 なら 1。「等しいか?」の判定に使う。<code>b.eq</code> は Z=1 のとき飛ぶ。</dd>
+      <dt>C (Carry)</dt>
+      <dd>符号なしでのキャリー / ボロー (繰り上がり / 繰り下がり)。<code>cmp a, b</code> で <code>a ≥ b</code> (符号なし) なら 1。</dd>
+      <dt>V (oVerflow)</dt>
+      <dd>符号ありで溢れが起きたら 1。<code>b.lt</code> / <code>b.gt</code> の判定に効く。</dd>
+    </div>
+  </div>
+</section>
+
+<!-- ================= INSTRUCTIONS ================= -->
+<section id="instructions">
+  <div class="container">
+    <div class="section-label">第四章 · 命令リファレンス</div>
+    <h2 class="section-title">
+      最小限の<br>
+      <span class="deco">語彙</span>
+    </h2>
+    <p style="max-width: 760px;">
+      AArch64 は RISC 寄りの単純な ISA で、実用的な範囲なら 50 命令ほど知っていれば読み書きできる。
+      以下はその中核。<strong>ニーモニック・書き方・意味・補足</strong>の 4 つを併記してある。
+      命令の書式は <code>mnemonic Xd, Xn, Xm</code> のように「左から:置き先, ソース 1, ソース 2」の順番が基本、と覚えるとほぼ読める。
+    </p>
+
+    <div class="diagram-wrap" style="margin-bottom: 2rem;">
+      <div class="diagram-title">命令の読み方 — ほぼ全てこの形</div>
+      <div class="inst-anatomy">
+        <svg viewBox="0 0 820 260" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="AArch64 命令の構造図">
+          <!-- Instruction tokens -->
+          <g font-family="IBM Plex Mono, monospace" font-size="28" font-weight="500">
+            <text x="80"  y="55" text-anchor="middle" fill="#f2b860">add</text>
+            <text x="200" y="55" text-anchor="middle" fill="#8ab0a8">x0</text>
+            <text x="250" y="55" text-anchor="middle" fill="#7d7362">,</text>
+            <text x="320" y="55" text-anchor="middle" fill="#8ab0a8">x1</text>
+            <text x="370" y="55" text-anchor="middle" fill="#7d7362">,</text>
+            <text x="440" y="55" text-anchor="middle" fill="#8ab0a8">x2</text>
+          </g>
+
+          <!-- Connector lines from each token down to labels -->
+          <g stroke="#d4a054" stroke-width="1.3" fill="none">
+            <path d="M 80 72 L 80 130"/>
+            <path d="M 200 72 L 200 150"/>
+            <path d="M 320 72 L 320 170"/>
+            <path d="M 440 72 L 440 190"/>
+          </g>
+
+          <!-- Horizontal dashes meeting labels -->
+          <g stroke="#d4a054" stroke-width="1.3" fill="none">
+            <line x1="80"  y1="130" x2="490" y2="130"/>
+            <line x1="200" y1="150" x2="490" y2="150"/>
+            <line x1="320" y1="170" x2="490" y2="170"/>
+            <line x1="440" y1="190" x2="490" y2="190"/>
+          </g>
+
+          <!-- Small end caps -->
+          <g fill="#d4a054">
+            <circle cx="490" cy="130" r="3"/>
+            <circle cx="490" cy="150" r="3"/>
+            <circle cx="490" cy="170" r="3"/>
+            <circle cx="490" cy="190" r="3"/>
+          </g>
+
+          <!-- Labels -->
+          <g font-family="IBM Plex Sans, sans-serif" font-size="13" fill="#e8dfcf">
+            <text x="505" y="134">命令 (操作)</text>
+            <text x="505" y="154">結果を入れる先 (destination)</text>
+            <text x="505" y="174">ソース 1 (レジスタ)</text>
+            <text x="505" y="194">ソース 2 (レジスタ または 即値)</text>
+          </g>
+
+          <!-- Result equation -->
+          <g font-family="IBM Plex Mono, monospace">
+            <rect x="80" y="218" width="380" height="32" fill="#221d17" stroke="#3a3026" rx="2"/>
+            <text x="100" y="239" font-size="15" fill="#7d7362">意味:</text>
+            <text x="155" y="239" font-size="15" fill="#8ab0a8">x0</text>
+            <text x="193" y="239" font-size="15" fill="#d4a054">=</text>
+            <text x="215" y="239" font-size="15" fill="#8ab0a8">x1</text>
+            <text x="253" y="239" font-size="15" fill="#d4a054">+</text>
+            <text x="275" y="239" font-size="15" fill="#8ab0a8">x2</text>
+          </g>
+        </svg>
+
+        <div class="inst-anatomy-note">
+          <p>
+            <code>X</code> ではなく <code>W</code> で書くと 32bit 版になる。例: <code>add w0, w1, w2</code> → 32bit 加算。
+          </p>
+          <p>
+            教材で見る <code>Xd, Xn, Xm</code> という記法は「<strong>d = destination</strong> (置き先)、<strong>n, m = source</strong> (ソース)」の慣習的な名付け。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="inst-tabs" id="inst-tabs">
+      <button class="inst-tab active" data-cat="move">データ移動</button>
+      <button class="inst-tab" data-cat="arith">算術</button>
+      <button class="inst-tab" data-cat="logic">論理・シフト</button>
+      <button class="inst-tab" data-cat="mem">メモリ</button>
+      <button class="inst-tab" data-cat="cmp">比較</button>
+      <button class="inst-tab" data-cat="branch">分岐</button>
+      <button class="inst-tab" data-cat="call">呼び出し</button>
+    </div>
+    <div id="inst-panels"></div>
+  </div>
+</section>
+
+
+<!-- ================= DISSECTION ================= -->
+<section id="dissection">
+  <div class="container">
+    <div class="section-label">第五章 · Hello, Silicon を解剖する</div>
+    <h2 class="section-title">
+      11 行の中に詰まっている<br>
+      <span class="deco">すべて</span>
+    </h2>
+    <p style="max-width: 760px;">
+      第一章で動かした Hello, Silicon のコードを、語彙が揃った今、改めて 1 行ずつ読み解く。
+      <strong>この 11 行に AArch64 と Apple ABI の基本がほぼ全て詰まっている</strong>。
+      ここを押さえれば、以降のハンズオンで出てくるパターンの大部分が既知のものになる。
+    </p>
+
+    <div class="code-wrap" style="margin-top: 1.5rem;">
+      <button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c">// hello.s ── C の printf 相当を asm だけで書いたもの</span>
+<span class="d">.global</span> _main
+<span class="d">.align</span> <span class="n">2</span>
+<span class="l">_main:</span>
+    <span class="k">stp</span>   <span class="r">x29</span>, <span class="r">x30</span>, [<span class="r">sp</span>, <span class="n">#-16</span>]!
+    <span class="k">adrp</span>  <span class="r">x0</span>, msg@PAGE
+    <span class="k">add</span>   <span class="r">x0</span>, <span class="r">x0</span>, msg@PAGEOFF
+    <span class="k">bl</span>    _puts
+    <span class="k">mov</span>   <span class="r">w0</span>, <span class="n">#0</span>
+    <span class="k">ldp</span>   <span class="r">x29</span>, <span class="r">x30</span>, [<span class="r">sp</span>], <span class="n">#16</span>
+    <span class="k">ret</span>
+<span class="d">.data</span>
+<span class="l">msg:</span> <span class="d">.asciz</span> <span class="s">"Hello, Silicon"</span></pre>
+    </div>
+
+
+    <div class="annotated">
+      <div class="ann-head">
+        <span>hello.s · 逐行解説</span>
+        <span>AArch64 · Darwin ABI</span>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">.global _main</div>
+        <div class="ann-note">
+          <strong>「_main というシンボルは外から見える」</strong> とリンカに伝える指示 (アセンブラ・ディレクティブ)。<code>.global</code> を付けないとリンカから見つからずリンクエラーになる。<strong>Apple の慣習で C の <code>main</code> はアセンブリ側では <code>_main</code></strong> と頭にアンダースコアが付く。
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">.align 2</div>
+        <div class="ann-note">
+          次に置くコードを <strong>2<sup>2</sup> = 4 バイト境界</strong> に整列させる指示。AArch64 の命令は全て 4 バイト固定長なので、命令の先頭アドレスが <strong>4 の倍数</strong>になっていないと CPU がまともに実行できない。<code>.align</code> を忘れるとクラッシュする。<em>「整列」「境界」って何？は <a href="#alignment-section" style="color:var(--amber-bright)">この直後の図解</a>を参照。</em>
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">_main:</div>
+        <div class="ann-note">
+          <strong>ラベル</strong>。ここから下の命令列の先頭アドレスに <code>_main</code> という名前を付ける。Cランタイムのスタートアップコードはこのラベルをエントリーポイントとして呼び出す。
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">    stp   x29, x30, [sp, #-16]!</div>
+        <div class="ann-note">
+          関数の冒頭で必ず書く <strong>プロローグ</strong>。<code>stp</code> は Store Pair、<strong>2つのレジスタを同時にメモリに保存する</strong>命令。ここでは <code>x29</code> (フレームポインタ) と <code>x30</code> (<strong>リンクレジスタ=戻り先アドレス</strong>) をスタックに退避している。<code>[sp, #-16]!</code> は「<strong>sp から 16 を引いて、その位置にストアして、その結果を sp に書き戻す</strong>」(プレデクリメント・ライトバック)。なぜ必要か: この後 <code>bl _puts</code> で関数呼び出しをすると x30 が上書きされてしまうので、先に避難させておく。
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">    adrp  x0, msg@PAGE</div>
+        <div class="ann-note">
+          <code>adrp</code> = "Address of PaGe"。<code>msg</code> という文字列が置かれている <strong>4KB ページの先頭アドレス</strong>を <code>x0</code> にロードする。なぜ 2 段階で住所を作るのかというと、AArch64 の 1 命令は 32 ビットしか情報が入らず、<strong>64 ビットの絶対アドレスをそのまま埋め込めない</strong>から。そこで「ページ単位で大まかに飛んで、次の命令で端数を足す」という設計になっている。
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">    add   x0, x0, msg@PAGEOFF</div>
+        <div class="ann-note">
+          さっきのページ先頭に、<code>msg</code> のページ内オフセット (0〜4095) を足して、<strong>正確な文字列アドレス</strong>を完成させる。結果として <code>x0</code> には "Hello, Silicon" の先頭アドレスが入る。<strong>X0 は AAPCS64 で第 1 引数として使われるレジスタ</strong>なので、これは次の <code>puts</code> への第 1 引数を準備している、ということ。
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">    bl    _puts</div>
+        <div class="ann-note">
+          <code>bl</code> = Branch with Link。<strong>関数呼び出し</strong>の命令。動作は 2 つあって、(1) この命令の<strong>次のアドレス</strong>を <code>x30</code> に書き込む (= 戻り場所を覚える)、(2) <code>_puts</code> のアドレスへジャンプする。<code>_puts</code> の実体はリンカが libc から解決する。C で書けば <code>puts("Hello, Silicon");</code> 一行。
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">    mov   w0, #0</div>
+        <div class="ann-note">
+          <strong>C の <code>return 0;</code> に相当</strong>。<code>w0</code> は 32 ビット幅の戻り値用レジスタで、C の <code>int</code> 型の戻り値 (0) をここに入れる。これで「正常終了」が呼び出し元 (Cランタイム) に伝わる。
+          <em><code>w0</code> と <code>x0</code> の違いについては<a href="#registers" style="color:var(--amber-bright)">第三章「レジスタ」</a>で詳述。ここでは「int を返すから w0 を使っている」とだけ覚えておけば十分。</em>
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">    ldp   x29, x30, [sp], #16</div>
+        <div class="ann-note">
+          関数末尾の <strong>エピローグ</strong>。プロローグで退避した 2 つのレジスタをスタックから復元する。<code>ldp</code> = Load Pair。<code>[sp], #16</code> は「<strong>現在の sp からロードして、その後 sp に 16 を足す</strong>」(ポストインクリメント)。プロローグの逆操作でスタックを元に戻している。
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">    ret</div>
+        <div class="ann-note">
+          <strong>関数からの復帰</strong>。暗黙に <code>x30</code> (リンクレジスタ) の値をプログラムカウンタにロードしてジャンプする。つまり <code>bl _main</code> で呼んできた Cランタイムの「続き」に戻る。エピローグで x30 を正しく復元しておかないと、どこか変な場所に飛んでクラッシュする。
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">.data</div>
+        <div class="ann-note">
+          ここから下はコードではなく<strong>データセクション</strong>ですよ、という指示。リンカがこの部分を実行ファイルの「データ領域」(読み書き可能、実行不可) に配置する。
+        </div>
+      </div>
+
+      <div class="ann-row">
+        <div class="ann-code">msg: .asciz "Hello, Silicon"</div>
+        <div class="ann-note">
+          ラベル <code>msg</code> を付けた場所に、<strong>ナル終端の ASCII 文字列</strong>を置く。<code>.asciz</code> の <strong>z は "zero" の z</strong>、つまり自動的に末尾に <code>\0</code> バイトを追加する。C の文字列と同じ仕様で、<code>puts</code> はこの <code>\0</code> を見て終端を判断する。
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="lead">ここまでで分かること</div>
+      AArch64 プログラムは、<strong>(1) プロローグで x29/x30 を退避 → (2) 引数をレジスタに用意 (第1引数は x0) → (3) bl で関数呼び出し → (4) 戻り値を x0/w0 に入れる → (5) エピローグで x29/x30 を復元 → (6) ret</strong> という流れが基本。これは今後出てくる全ての関数で同じパターンなので、<strong>最初にしっかり覚える</strong>価値がある。
+    </div>
+
+    <h3 id="alignment-section" style="margin-top: 2.5rem;">補足：「4 バイト境界」とは何か</h3>
+    <p>
+      <code>.align 2</code> の解説で出てきた「境界 (alignment)」は、<strong>データを置ける場所の住所 (アドレス) に対する制約</strong>のこと。ここだけ独立して解説する。
+    </p>
+    <p>
+      メモリは 1 バイトずつ番地が振られた広大な倉庫だと思ってよい。
+      0 番地、1 番地、2 番地、……と続く。
+    </p>
+
+    <div class="align-vis">
+      <div class="align-vis-title">メモリの番地 (下から上に向かって増える ── ここでは左から右)</div>
+      <div class="align-ruler">
+        <div class="addr mark4">0</div><div class="addr">1</div><div class="addr">2</div><div class="addr">3</div>
+        <div class="addr mark4">4</div><div class="addr">5</div><div class="addr">6</div><div class="addr">7</div>
+        <div class="addr mark4">8</div><div class="addr">9</div><div class="addr">10</div><div class="addr">11</div>
+        <div class="addr mark4">12</div><div class="addr">13</div><div class="addr">14</div><div class="addr">15</div>
+
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+      </div>
+    </div>
+
+    <p>
+      上の図で、<span style="color:var(--amber-bright);">アンバー色の縦線</span>が引かれている場所 ── 0, 4, 8, 12 ── が<strong>「4 の倍数のアドレス」</strong>。これを <strong>「4 バイト境界 (4-byte boundary)」</strong>と呼ぶ。
+      「<strong>4 バイト境界に整列している</strong>」とは、ある物の先頭アドレスがこの縦線のどれかに一致している、という意味。
+    </p>
+
+    <p>
+      AArch64 の<strong>命令は全て 4 バイト固定長</strong>。1 命令が 4 バイトを占める。CPU は「命令の先頭は必ず 4 の倍数アドレスにある」という前提で動作しているので、これがズレるとクラッシュする。
+    </p>
+
+    <div class="align-vis">
+      <div class="align-vis-title">整列している例 (OK) — 命令がアドレス 0 から始まる</div>
+      <div class="align-ruler">
+        <div class="addr mark4">0</div><div class="addr">1</div><div class="addr">2</div><div class="addr">3</div>
+        <div class="addr mark4">4</div><div class="addr">5</div><div class="addr">6</div><div class="addr">7</div>
+        <div class="addr mark4">8</div><div class="addr">9</div><div class="addr">10</div><div class="addr">11</div>
+        <div class="addr mark4">12</div><div class="addr">13</div><div class="addr">14</div><div class="addr">15</div>
+
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+      </div>
+      <div class="align-bracket">
+        <div class="slot inst">add x0, x0, x1 (4 bytes)</div>
+        <div class="slot inst">ret (4 bytes)</div>
+        <div class="slot"></div>
+        <div class="slot"></div>
+      </div>
+      <div class="align-group-ok">
+        <span class="align-badge ok">✓ 整列</span>
+        <span style="color:var(--text-dim);">各命令の先頭 (アドレス 0 と 4) が 4 の倍数の境界に一致している</span>
+      </div>
+    </div>
+
+    <div class="align-vis">
+      <div class="align-vis-title">ズレた例 (NG) — 命令がアドレス 1 から始まる</div>
+      <div class="align-ruler">
+        <div class="addr mark4">0</div><div class="addr">1</div><div class="addr">2</div><div class="addr">3</div>
+        <div class="addr mark4">4</div><div class="addr">5</div><div class="addr">6</div><div class="addr">7</div>
+        <div class="addr mark4">8</div><div class="addr">9</div><div class="addr">10</div><div class="addr">11</div>
+        <div class="addr mark4">12</div><div class="addr">13</div><div class="addr">14</div><div class="addr">15</div>
+
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+        <div class="align-byte boundary"></div><div class="align-byte"></div><div class="align-byte"></div><div class="align-byte"></div>
+      </div>
+      <div class="align-bracket">
+        <div class="slot"></div>
+        <div class="slot inst misaligned offset1">add x0, x0, x1 (1〜4 に跨る)</div>
+        <div class="slot inst misaligned">ret (5〜8 に跨る)</div>
+        <div class="slot"></div>
+      </div>
+      <div class="align-group-bad">
+        <span class="align-badge bad">✗ 不整列</span>
+        <span style="color:var(--text-dim);">命令が境界を跨いでしまっている ── CPU はこのままでは実行できない</span>
+      </div>
+    </div>
+
+    <p>
+      <code>.align N</code> ディレクティブは、<strong>次に置くデータの先頭アドレスを 2<sup>N</sup> バイト境界に揃える</strong>という意味。必要なら間に 0 (NOP) を自動で詰めてくれる。
+    </p>
+    <dl class="deflist">
+      <dt>.align 0</dt>
+      <dd>2<sup>0</sup> = 1 バイト境界 (= 何もしない、全アドレス)</dd>
+      <dt>.align 1</dt>
+      <dd>2<sup>1</sup> = 2 バイト境界 (偶数アドレス)</dd>
+      <dt>.align 2</dt>
+      <dd>2<sup>2</sup> = <strong>4 バイト境界</strong> — AArch64 命令に必須</dd>
+      <dt>.align 3</dt>
+      <dd>2<sup>3</sup> = 8 バイト境界 — 64bit データ (<code>long</code>) を置くときに使う</dd>
+      <dt>.align 4</dt>
+      <dd>2<sup>4</sup> = 16 バイト境界 — スタックポインタの制約と同じ</dd>
+    </dl>
+    <p class="hint">
+      つまり <code>.align 2</code> は <strong>「この先にあるものは 4 バイト境界に置いてね」</strong>とアセンブラに頼む、たった一行のおまじない。
+      これを忘れると、直前にたまたま文字列データなどが 4 の倍数で終わっていなかった場合にズレて、CPU が動かない。
+      AArch64 アセンブリを書くときは、関数の直前に必ず <code>.align 2</code> を書く、と覚えてしまえばよい。
+    </p>
+
+    <h3 style="margin-top: 2.5rem;">図解：呼び出しとスタック</h3>
+    <p>
+      <code>bl _puts</code> を実行した瞬間、スタックとレジスタがどうなっているかを視覚化する。
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">bl _puts を実行した直後の状態</div>
+      <div class="diagram-2col">
+
+        <div class="diagram-col">
+          <div class="diagram-col-label">レジスタ</div>
+          <div class="reg-vis-list">
+            <div class="reg-vis-row">
+              <div class="reg-vis-name">X0</div>
+              <div class="reg-vis-arrow"></div>
+              <div class="reg-vis-val">
+                <div class="reg-vis-val-main">"Hello, Silicon" の先頭アドレス</div>
+                <div class="reg-vis-val-sub">puts の第 1 引数</div>
+              </div>
+            </div>
+            <div class="reg-vis-row">
+              <div class="reg-vis-name">X29</div>
+              <div class="reg-vis-arrow"></div>
+              <div class="reg-vis-val">
+                <div class="reg-vis-val-main">呼び出し元のフレームポインタ</div>
+                <div class="reg-vis-val-sub">退避済み · 値は保持</div>
+              </div>
+            </div>
+            <div class="reg-vis-row highlight">
+              <div class="reg-vis-name">X30</div>
+              <div class="reg-vis-arrow"></div>
+              <div class="reg-vis-val">
+                <div class="reg-vis-val-main">bl の次の命令 (mov w0, #0) のアドレス</div>
+                <div class="reg-vis-val-sub">puts から戻る場所</div>
+              </div>
+            </div>
+            <div class="reg-vis-row">
+              <div class="reg-vis-name">SP</div>
+              <div class="reg-vis-arrow"></div>
+              <div class="reg-vis-val">
+                <div class="reg-vis-val-main">退避領域の先頭</div>
+                <div class="reg-vis-val-sub">16 バイト境界に整列済み</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="diagram-col">
+          <div class="diagram-col-label">スタック</div>
+          <div class="stack-vis">
+            <div class="stack-addr-label top">高アドレス</div>
+            <div class="stack-frame">
+              <div class="stack-cell old">
+                <span class="stack-cell-desc">Cランタイムが積んだもの</span>
+                <span class="stack-cell-size">…</span>
+              </div>
+              <div class="stack-cell saved">
+                <span class="stack-cell-desc">呼び出し元の x29 (FP)</span>
+                <span class="stack-cell-size">8 bytes</span>
+              </div>
+              <div class="stack-cell saved">
+                <span class="stack-cell-desc">呼び出し元の x30 (LR)</span>
+                <span class="stack-cell-size">8 bytes</span>
+              </div>
+              <div class="stack-sp-marker">
+                <span class="stack-sp-arrow">SP →</span>
+                <span class="stack-sp-note">現在の sp</span>
+              </div>
+              <div class="stack-cell free">
+                <span class="stack-cell-desc">未使用</span>
+                <span class="stack-cell-size">…</span>
+              </div>
+            </div>
+            <div class="stack-addr-label bottom">低アドレス</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="hint">
+      <code>_puts</code> の中身も同じプロローグ／エピローグを持つので、その中でも別の関数を呼べる。
+      関数呼び出しが何重に入れ子になっても壊れないのは、<strong>全員がこの約束 (ABI) を守っているから</strong>。
+    </p>
+  </div>
+</section>
+<!-- ================= SAMPLES ================= -->
+<section id="samples">
+  <div class="container">
+    <div class="section-label">第六章 · ハンズオン</div>
+    <h2 class="section-title">
+      手を動かして<br>
+      <span class="deco">確かめる</span>
+    </h2>
+    <p style="max-width: 760px;">
+      前章で Hello, Silicon の構造を押さえた今、手を動かして実際に小さなプログラムを書き足していく番。
+      本章ではコピー & ペーストで動くサンプルが並ぶ。<strong>方針 B</strong>（libc 呼び出し）、
+      <strong>方針 C</strong>（C から asm を見る）、<strong>方針 A</strong>（syscall 直叩き）の三系統。
+      いずれも作業ディレクトリで <code>cat &gt; file.s &lt;&lt;'EOF'</code> の要領で投入し、
+      <code>clang -o</code> でビルドする。
+    </p>
+
+    <div class="sample-tabs">
+      <button class="sample-tab active" data-sample="b">方針 B / libc 呼び出し</button>
+      <button class="sample-tab" data-sample="c">方針 C / C と asm の対応</button>
+      <button class="sample-tab" data-sample="a">方針 A / syscall 直叩き</button>
+    </div>
+
+    <!-- SAMPLE B -->
+    <div class="sample active" data-sample="b">
+      <h4>B-1 · 足し算関数を asm で書き、C から呼ぶ</h4>
+      <p>最も典型的な「asm + C」の形。<code>add_two</code> という関数をアセンブリで書いて、C から呼び出す。<strong>この 5 行だけで AArch64 のすべてが詰まっている</strong>ので、じっくり見る。</p>
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c">// add.s ── x0 と x1 を足して x0 で返す</span>
+.global _add_two
+.align 2
+_add_two:
+    <span class="k">add</span>   <span class="r">x0</span>, <span class="r">x0</span>, <span class="r">x1</span>
+    <span class="k">ret</span></pre></div>
+
+      <div class="annotated">
+        <div class="ann-head"><span>add.s · 逐行解説</span><span>5 lines</span></div>
+        <div class="ann-row"><div class="ann-code">.global _add_two</div>
+          <div class="ann-note">関数 <code>_add_two</code> を外部公開する (C から呼べるようにする)。<strong>C の <code>add_two</code> はアセンブリ側では <code>_add_two</code></strong>、先頭にアンダースコアが付く Apple の慣習。</div></div>
+        <div class="ann-row"><div class="ann-code">.align 2</div>
+          <div class="ann-note">次に続く命令を 4 バイト境界に揃える。AArch64 命令は 4 バイト固定長なので必須。</div></div>
+        <div class="ann-row"><div class="ann-code">_add_two:</div>
+          <div class="ann-note">関数本体の入口。<strong>C から呼ばれるとここに飛んでくる</strong>。このとき ABI により、<code>a</code> は <code>x0</code> に、<code>b</code> は <code>x1</code> に、それぞれ既に入っている状態になっている。</div></div>
+        <div class="ann-row"><div class="ann-code">    add   x0, x0, x1</div>
+          <div class="ann-note">意味は <strong><code>x0 = x0 + x1</code></strong>。左が結果の置き先、右 2 つが足すソース。結果を <code>x0</code> に入れるのは <strong>x0 が戻り値用のレジスタ</strong>だから (AAPCS64)。C で言えば <code>return a + b;</code> の本体。この関数は <code>x30</code> を壊さない (別の関数を呼ばない) ので、プロローグ／エピローグが<strong>不要</strong>。これが「葉関数 (leaf function)」と呼ばれる最小形。</div></div>
+        <div class="ann-row"><div class="ann-code">    ret</div>
+          <div class="ann-note">呼び出し元に戻る。暗黙に <code>x30</code> の値へジャンプする。C から呼ばれたときは、C コンパイラが用意した戻り先が <code>x30</code> に入っているので、そこに戻れば関数としての務めは完了。</div></div>
+      </div>
+
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c">// main.c</span>
+<span class="cp">#include</span> <span class="ch">&lt;stdio.h&gt;</span>
+<span class="ct">long</span> <span class="cf">add_two</span>(<span class="ct">long</span> a, <span class="ct">long</span> b);       <span class="c">// asm 側を宣言</span>
+<span class="ct">int</span> <span class="cf">main</span>(<span class="ct">void</span>) {
+    <span class="cf">printf</span>(<span class="s">"%ld\n"</span>, <span class="cf">add_two</span>(<span class="n">40</span>, <span class="n">2</span>));<span class="c">// C から呼ぶ</span>
+    <span class="cw">return</span> <span class="n">0</span>;
+}</pre></div>
+
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code">clang -o add main.c add.s
+./add    <span class="c"># → 42</span></pre></div>
+
+      <div class="callout">
+        <div class="lead">肝</div>
+        C 側が <code>add_two(40, 2)</code> と書くと、C コンパイラが「40 を x0、2 を x1 に入れて <code>bl _add_two</code>」というコードを吐く。アセンブリ側はその<strong>お膳立て済みの状態でスタートする</strong>。だから asm 側で <code>x0</code> と <code>x1</code> の初期値の出所を気にしなくていい。これが ABI の力。
+      </div>
+
+      <h4>B-2 · ループで合計を計算する</h4>
+      <p>1 から n までを足す。<strong>ループと条件分岐</strong>をどう書くかがここで分かる。</p>
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c">// sum.s ── 1 から x0 までの整数を合計して x0 で返す</span>
+.global _sum_to
+.align 2
+_sum_to:
+    <span class="k">mov</span>   <span class="r">x1</span>, <span class="n">#0</span>            <span class="c">// accumulator</span>
+    <span class="k">mov</span>   <span class="r">x2</span>, <span class="n">#1</span>            <span class="c">// counter</span>
+<span class="l">Lloop:</span>
+    <span class="k">cmp</span>   <span class="r">x2</span>, <span class="r">x0</span>
+    <span class="k">b.gt</span>  <span class="l">Ldone</span>
+    <span class="k">add</span>   <span class="r">x1</span>, <span class="r">x1</span>, <span class="r">x2</span>
+    <span class="k">add</span>   <span class="r">x2</span>, <span class="r">x2</span>, <span class="n">#1</span>
+    <span class="k">b</span>     <span class="l">Lloop</span>
+<span class="l">Ldone:</span>
+    <span class="k">mov</span>   <span class="r">x0</span>, <span class="r">x1</span>
+    <span class="k">ret</span></pre></div>
+
+      <div class="annotated">
+        <div class="ann-head"><span>sum.s · 逐行解説</span><span>ループ構造の分解</span></div>
+        <div class="ann-row"><div class="ann-code">    mov   x1, #0</div>
+          <div class="ann-note">C の <code>long s = 0;</code> に相当。累積和を入れる箱を <code>x1</code> に用意し 0 で初期化。<strong>x1 は呼び出し元から見れば引数だったレジスタ</strong>だが、<code>sum_to</code> は引数を 1 個しか取らない (<code>x0</code> のみ使用) のでここでは自由に使える。</div></div>
+        <div class="ann-row"><div class="ann-code">    mov   x2, #1</div>
+          <div class="ann-note">ループカウンタ <code>i</code> を <code>x2</code> に用意し 1 からスタート。C で言えば <code>for (long i = 1; ...)</code> の <code>i = 1</code> の部分。</div></div>
+        <div class="ann-row"><div class="ann-code">Lloop:</div>
+          <div class="ann-note">ループ先頭のラベル。ここへ戻ってくる。<strong>L で始まるラベルはローカル</strong> (関数内限定) の慣習。</div></div>
+        <div class="ann-row"><div class="ann-code">    cmp   x2, x0</div>
+          <div class="ann-note"><strong>比較命令</strong>。中身は「<code>x2 - x0</code> を計算するが結果は捨て、フラグ (NZCV) だけ更新する」。つまり <code>i - n</code> の符号と零判定を準備している。結果自体はどこにも残らない。</div></div>
+        <div class="ann-row"><div class="ann-code">    b.gt  Ldone</div>
+          <div class="ann-note">Branch if Greater Than。<strong>直前の比較結果が「>」なら <code>Ldone</code> へ飛ぶ</strong>。C で言えば <code>if (i > n) goto Ldone;</code>。つまり「カウンタが n を超えたら終了」。フラグが <code>gt</code> 条件を満たさなければ、次の命令へ素通りする。</div></div>
+        <div class="ann-row"><div class="ann-code">    add   x1, x1, x2</div>
+          <div class="ann-note"><code>s += i</code>。累積和に現在のカウンタ値を加える。</div></div>
+        <div class="ann-row"><div class="ann-code">    add   x2, x2, #1</div>
+          <div class="ann-note"><code>i++</code>。カウンタを 1 増やす。<strong>レジスタと即値の加算</strong>なので、2 つ目のソースに <code>#1</code> が来ている。</div></div>
+        <div class="ann-row"><div class="ann-code">    b     Lloop</div>
+          <div class="ann-note">無条件で <code>Lloop</code> へジャンプ。C の「ループの末尾から先頭へ戻る」に対応。<code>b</code> は <code>bl</code> と違い <strong>x30 を書き換えない</strong> (戻ってくる予定がないので)。</div></div>
+        <div class="ann-row"><div class="ann-code">Ldone:</div>
+          <div class="ann-note">ループ脱出地点。</div></div>
+        <div class="ann-row"><div class="ann-code">    mov   x0, x1</div>
+          <div class="ann-note">累積和を戻り値レジスタ <code>x0</code> にコピー。<strong>なぜ最初から <code>x0</code> に溜めなかったか</strong>というと、<code>x0</code> は引数 (n) で使われていたから。ループ条件で <code>x0</code> と比較するので、書き換えずに取っておく必要があった。</div></div>
+        <div class="ann-row"><div class="ann-code">    ret</div>
+          <div class="ann-note">戻る。この関数も他の関数を呼ばないのでプロローグ／エピローグ不要。</div></div>
+      </div>
+
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c">// main.c</span>
+<span class="cp">#include</span> <span class="ch">&lt;stdio.h&gt;</span>
+<span class="ct">long</span> <span class="cf">sum_to</span>(<span class="ct">long</span> n);
+<span class="ct">int</span> <span class="cf">main</span>(<span class="ct">void</span>) { <span class="cf">printf</span>(<span class="s">"%ld\n"</span>, <span class="cf">sum_to</span>(<span class="n">100</span>)); <span class="cw">return</span> <span class="n">0</span>; }
+
+<span class="c"># ビルドと実行</span>
+clang -o sum main.c sum.s &amp;&amp; ./sum   <span class="c"># → 5050</span></pre></div>
+
+      <div class="callout">
+        <div class="lead">学び</div>
+        AArch64 の条件分岐は<strong>必ず 2 段階</strong>: (1) <code>cmp</code> で比較してフラグを立てる → (2) <code>b.xx</code> でそのフラグを見て飛ぶ。<code>cmp</code> の結果をどこにも保存しないのが奇妙に感じるかもしれないが、フラグという「隠れた出力」があると考えるとよい。
+      </div>
+
+      <h4>B-3 · スタックフレームと printf の呼び出し</h4>
+      <p>
+        関数から <code>printf</code> を呼ぶには、<strong>x30 (LR) を退避するためのスタックフレーム</strong>を作る必要がある (B-1, B-2 は他の関数を呼ばなかったので不要だった)。
+        Apple ABI では <code>stp x29, x30, [sp, #-16]!</code> が定型句。
+        このサンプルは冒頭の Hello, Silicon と同じ構造だが、<strong>引数を 3 つ渡す</strong>部分が新しい。
+      </p>
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c">// greet.s ── printf("%s, %ld!\n", name, n)</span>
+.global _main
+.align 2
+_main:
+    <span class="k">stp</span>   <span class="r">x29</span>, <span class="r">x30</span>, [<span class="r">sp</span>, <span class="n">#-16</span>]!   <span class="c">// プロローグ</span>
+    <span class="k">mov</span>   <span class="r">x29</span>, <span class="r">sp</span>
+
+    <span class="k">adrp</span>  <span class="r">x0</span>, fmt@PAGE
+    <span class="k">add</span>   <span class="r">x0</span>, <span class="r">x0</span>, fmt@PAGEOFF
+    <span class="k">adrp</span>  <span class="r">x1</span>, name@PAGE
+    <span class="k">add</span>   <span class="r">x1</span>, <span class="r">x1</span>, name@PAGEOFF
+    <span class="k">mov</span>   <span class="r">x2</span>, <span class="n">#42</span>
+    <span class="k">bl</span>    _printf
+
+    <span class="k">mov</span>   <span class="r">w0</span>, <span class="n">#0</span>
+    <span class="k">ldp</span>   <span class="r">x29</span>, <span class="r">x30</span>, [<span class="r">sp</span>], <span class="n">#16</span>    <span class="c">// エピローグ</span>
+    <span class="k">ret</span>
+
+.data
+fmt:  .asciz <span class="s">"%s, %ld!\n"</span>
+name: .asciz <span class="s">"Hello"</span></pre></div>
+
+      <div class="annotated">
+        <div class="ann-head"><span>greet.s · 新しい部分だけ解説</span><span>printf への引数 3 つの渡し方</span></div>
+        <div class="ann-row"><div class="ann-code">    mov   x29, sp</div>
+          <div class="ann-note">新しいフレームポインタを設定する。プロローグで sp を 16 下げたので、その新しい sp を x29 (FP) に記録しておく。デバッガが関数のフレームを辿るときに使う。省略しても動くが、書くのが作法。</div></div>
+        <div class="ann-row"><div class="ann-code">    adrp  x0, fmt@PAGE<br>    add   x0, x0, fmt@PAGEOFF</div>
+          <div class="ann-note"><strong>printf の第 1 引数</strong> (フォーマット文字列) を <code>x0</code> に。adrp+add の 2 段で絶対アドレスを組み立てる (Hello, Silicon と同じ)。</div></div>
+        <div class="ann-row"><div class="ann-code">    adrp  x1, name@PAGE<br>    add   x1, x1, name@PAGEOFF</div>
+          <div class="ann-note"><strong>printf の第 2 引数</strong> ("%s" に対応する文字列) を <code>x1</code> に。<strong>第 2 引数は x1</strong> というのが ABI のルール。</div></div>
+        <div class="ann-row"><div class="ann-code">    mov   x2, #42</div>
+          <div class="ann-note"><strong>printf の第 3 引数</strong> ("%ld" に対応する数値) を <code>x2</code> に。<strong>第 3 引数は x2</strong>。即値 (定数 42) なので mov で直接入れる。<br>引数は <strong>x0, x1, x2, x3, ... x7 の順に 8 個までレジスタ渡し</strong>、9 個目以降はスタック経由になる。</div></div>
+        <div class="ann-row"><div class="ann-code">    bl    _printf</div>
+          <div class="ann-note">printf を呼ぶ。<strong>この瞬間 x30 は書き換えられる</strong> (bl の (1) の動作) のだが、プロローグで退避済みなので問題ない。printf の中で x0〜x2 も壊される可能性があるが、この関数ではもう使わないので OK。</div></div>
+      </div>
+    </div>
+
+    <!-- SAMPLE C -->
+    <div class="sample" data-sample="c">
+      <h4>C-1 · C を書いて asm を見る</h4>
+      <p>
+        <code>clang -S</code> で <code>.s</code> を生成すると、コンパイラがどんな AArch64 を吐くかを観察できる。
+        最適化レベルを変えて比較すると効果が一目瞭然。
+      </p>
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c">// square.c</span>
+<span class="ct">long</span> <span class="cf">square</span>(<span class="ct">long</span> x) { <span class="cw">return</span> x <span class="co">*</span> x; }
+<span class="ct">long</span> <span class="cf">sum_to</span>(<span class="ct">long</span> n) {
+    <span class="ct">long</span> s <span class="co">=</span> <span class="n">0</span>;
+    <span class="cw">for</span> (<span class="ct">long</span> i <span class="co">=</span> <span class="n">1</span>; i <span class="co">&lt;=</span> n; i<span class="co">++</span>) s <span class="co">+=</span> i;
+    <span class="cw">return</span> s;
+}</pre></div>
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c"># 最適化なし（素朴な対応が見える）</span>
+clang -S -O0 -o square-O0.s square.c
+
+<span class="c"># 最適化あり（ループが閉じた式になるかもしれない）</span>
+clang -S -O2 -o square-O2.s square.c
+
+<span class="c"># 差分を見る</span>
+diff square-O0.s square-O2.s | head -60</pre></div>
+
+      <h4>C-2 · バイナリから逆アセンブル</h4>
+      <p>
+        実行ファイルそのものを逆に読む。<code>.s</code> と <code>otool -tvV</code> の出力を突き合わせると、
+        ニーモニック、バイト列、アドレスの対応が揃う。
+      </p>
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code">clang -O2 -c -o square.o square.c
+otool -tvV square.o            <span class="c"># 逆アセンブル（ニーモニック）</span>
+otool -tv  square.o            <span class="c"># 16進バイトも表示</span>
+objdump -d --macho square.o    <span class="c"># 別系統の逆アセンブラ</span></pre></div>
+
+      <h4>C-3 · lldb で一命令ずつ追う</h4>
+      <p>
+        <code>lldb</code> でバイナリを開き、命令単位でステップ実行するとレジスタの変化が見える。
+        これが <em>一番学びが多い</em> と言っても過言ではない。
+      </p>
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code">clang -g -O0 -o square_main square.c -Dmain=main_c &lt;(echo '
+<span class="ct">int</span> <span class="cf">main_c</span>(<span class="ct">void</span>); <span class="ct">int</span> <span class="cf">main</span>(<span class="ct">void</span>){ <span class="cw">return</span> (<span class="ct">int</span>)<span class="cf">main_c</span>(); }
+<span class="ct">long</span> <span class="cf">sum_to</span>(<span class="ct">long</span>);
+<span class="ct">int</span> <span class="cf">main_c</span>(<span class="ct">void</span>){ <span class="cw">return</span> (<span class="ct">int</span>)<span class="cf">sum_to</span>(<span class="n">10</span>); }') -x c -
+
+lldb ./square_main
+(lldb) b sum_to
+(lldb) run
+(lldb) disassemble --frame
+(lldb) register read
+(lldb) stepi          <span class="c"># 1 命令進める</span>
+(lldb) register read x0 x1 x2</pre></div>
+    </div>
+
+    <!-- SAMPLE A -->
+    <div class="sample" data-sample="a">
+      <h4>A-1 · write syscall で直接出力する</h4>
+      <p>
+        libc を一切使わず、Darwin の <code>write(2)</code> システムコールだけで文字列を出す。
+        <strong>OS との境界がここに露出している</strong>、つまり普段は libc が隠している部分を自分で書く。
+        syscall 番号は <code>X16</code>、引数は <code>X0〜X5</code>、呼び出しは <code>svc #0x80</code>。
+      </p>
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code"><span class="c">// raw.s ── libc なしで "Raw!\n" を書く</span>
+.global _main
+.align 2
+
+_main:
+    <span class="k">mov</span>   <span class="r">x0</span>, <span class="n">#1</span>             <span class="c">// fd = stdout</span>
+    <span class="k">adrp</span>  <span class="r">x1</span>, msg@PAGE
+    <span class="k">add</span>   <span class="r">x1</span>, <span class="r">x1</span>, msg@PAGEOFF
+    <span class="k">mov</span>   <span class="r">x2</span>, <span class="n">#5</span>             <span class="c">// length</span>
+    <span class="k">mov</span>   <span class="r">x16</span>, <span class="n">#4</span>            <span class="c">// SYS_write = 4</span>
+    <span class="k">svc</span>   <span class="n">#0x80</span>           <span class="c">// カーネルに降りる</span>
+
+    <span class="k">mov</span>   <span class="r">x0</span>, <span class="n">#0</span>
+    <span class="k">mov</span>   <span class="r">x16</span>, <span class="n">#1</span>            <span class="c">// SYS_exit = 1</span>
+    <span class="k">svc</span>   <span class="n">#0x80</span>
+
+.data
+msg: .ascii <span class="s">"Raw!\n"</span></pre></div>
+
+      <div class="annotated">
+        <div class="ann-head"><span>raw.s · syscall の仕組み</span><span>Darwin ABI</span></div>
+        <div class="ann-row"><div class="ann-code">    mov   x0, #1</div>
+          <div class="ann-note"><strong>write(fd, buf, len)</strong> の第 1 引数 <code>fd</code>。1 は stdout (標準出力) を意味する慣習的な番号。2 なら stderr、0 なら stdin。</div></div>
+        <div class="ann-row"><div class="ann-code">    adrp  x1, msg@PAGE<br>    add   x1, x1, msg@PAGEOFF</div>
+          <div class="ann-note">第 2 引数 <code>buf</code> = 書き出す文字列の先頭アドレスを <code>x1</code> に。libc 呼び出しと同じ adrp+add の 2 段構え。</div></div>
+        <div class="ann-row"><div class="ann-code">    mov   x2, #5</div>
+          <div class="ann-note">第 3 引数 <code>len</code> = 書き出すバイト数。"Raw!\n" で 5 バイト (R, a, w, !, 改行)。</div></div>
+        <div class="ann-row"><div class="ann-code">    mov   x16, #4</div>
+          <div class="ann-note">ここが <strong>syscall と関数呼び出しの違い</strong>。<strong>Darwin は呼び出したいシステムコールの番号を x16 に入れる慣習</strong>。4 は <code>write</code> の番号 (<code>&lt;sys/syscall.h&gt;</code> の <code>SYS_write</code> に定義されている)。Linux では x8 を使うなど OS によって違う。</div></div>
+        <div class="ann-row"><div class="ann-code">    svc   #0x80</div>
+          <div class="ann-note"><strong>SVC = Supervisor Call</strong>。これが <strong>「ユーザランドからカーネルへ降りる」瞬間</strong>。CPU の特権レベルが切り替わり、カーネルが x16 の番号を見て対応する処理 (write) を実行する。引数 x0〜x5 はカーネル側がそのまま読み、結果を x0 に書いて戻ってくる。<code>#0x80</code> は Darwin の慣習的な値で、意味は OS が定める。</div></div>
+        <div class="ann-row"><div class="ann-code">    mov   x0, #0<br>    mov   x16, #1<br>    svc   #0x80</div>
+          <div class="ann-note">プログラムを終了する syscall。<strong>exit(0)</strong> に相当。番号 1 が <code>SYS_exit</code>、第 1 引数 (x0) が終了ステータス。libc が普段やっている「main の戻り値を受け取って exit システムコールを呼ぶ」ところを自分で書いている。<strong>この svc は戻ってこない</strong>のでプロセスが終わる。</div></div>
+      </div>
+
+      <div class="code-wrap"><button class="copy-btn" data-copy>Copy</button>
+<pre class="code">clang -o raw raw.s &amp;&amp; ./raw    <span class="c"># → Raw!</span></pre></div>
+
+      <div class="callout">
+        <div class="lead">一段下の世界</div>
+        B-3 の <code>printf("Hello, 42!\n")</code> は、内部的にはこの A-1 とほぼ同じことをしている ── 文字列をバッファに整形し、最終的には <code>write(1, buf, len)</code> の syscall が呼ばれている。<strong>libc は syscall の薄いラッパー</strong>、と言われる所以。
+      </div>
+
+      <div class="callout">
+        <div class="lead">なぜ補助扱いか</div>
+        Darwin の syscall 番号は Apple から公式に一覧が公開されておらず、
+        <code>/usr/include/sys/syscall.h</code> や XNU カーネルのソース (<code>syscalls.master</code>) を
+        読まないと正確な番号が分からない。Linux の <code>asm/unistd.h</code> のように
+        安定した入口ではないので、学習の主軸にするには不向きである。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SIMULATOR ================= -->
+<section id="simulator">
+  <div class="container">
+    <div class="section-label">第七章 · ブラウザ内シミュレータ</div>
+    <h2 class="section-title">
+      ターミナルに降りる前の<br>
+      <span class="deco">サンドボックス</span>
+    </h2>
+    <p style="max-width: 760px;">
+      実機を触る前に頭の中のモデルを作るため、本書にはブラウザで動く簡易 AArch64 シミュレータを同梱した。
+      サポートするのは代表的な命令のサブセット<small style="color: var(--text-faint);">
+      （mov, add, sub, mul, and, orr, eor, lsl, lsr, cmp, b, b.eq 等, cbz/cbnz, ldr, str, bl, ret）</small>
+      で、ステップ実行でレジスタと NZCV フラグとメモリの変化を観察できる。
+      <strong>計算結果は <code>X0</code> レジスタで受け取る規約</strong>
+      （AAPCS64・ARM 呼び出し規約）になっているので、<strong>実行後は右ペイン上部の「戻り値 · X0」を確認する</strong>と答えが読める。
+    </p>
+
+    <div class="sim-wrap">
+      <div class="sim-header">
+        <span>◉ AArch64 Sandbox</span>
+        <span class="dots">
+          <span class="dot live"></span><span class="dot"></span><span class="dot"></span>
+        </span>
+      </div>
+
+      <div class="sim-toolbar">
+        <button class="sim-btn primary" id="sim-run">▶ Run</button>
+        <button class="sim-btn" id="sim-step">→ Step</button>
+        <button class="sim-btn" id="sim-reset">↺ Reset</button>
+        <select class="sim-sel" id="sim-preset">
+          <option value="addloop">Example: 合計ループ</option>
+          <option value="fact">Example: 階乗</option>
+          <option value="memory">Example: メモリ書き込み</option>
+          <option value="branch">Example: 条件分岐</option>
+          <option value="swap">Example: swap</option>
+        </select>
+      </div>
+
+      <div class="sim-layout">
+        <div class="sim-editor-col">
+          <textarea class="sim-editor" id="sim-editor" spellcheck="false"></textarea>
+          <div class="sim-viewer" id="sim-viewer" style="display:none;"></div>
+        </div>
+
+        <div class="sim-state">
+          <div class="sim-state-tabs">
+            <button class="sim-state-tab active" data-panel="regs">Registers</button>
+            <button class="sim-state-tab" data-panel="mem">Memory</button>
+          </div>
+
+          <div class="sim-state-panel active" data-panel="regs" id="panel-regs">
+            <div class="result-banner idle" id="result-banner">
+              <div class="rb-label">戻り値 · X0</div>
+              <div class="rb-row">
+                <span class="rb-dec">Run を押すと結果がここに出ます</span>
+              </div>
+            </div>
+            <div class="flags-row" id="flags-row"></div>
+            <div id="regs-list"></div>
+          </div>
+
+          <div class="sim-state-panel" data-panel="mem" id="panel-mem">
+            <div id="mem-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sim-console" id="sim-console">ready.</div>
+    </div>
+
+    <div class="callout" style="margin-top: 1.5rem;">
+      <div class="lead">注意</div>
+      このシミュレータは学習目的のおもちゃであり、実 CPU の完全な挙動を再現するものではない。
+      条件フラグの扱いや未定義挙動は ARM Architecture Reference Manual と異なる場合がある。
+      本物の挙動を確かめるには、必ず上のサンプルを M1 で実際に走らせてほしい。
+    </div>
+  </div>
+</section>
+
+<!-- ================= EXERCISES ================= -->
+<section id="exercises">
+  <div class="container">
+    <div class="section-label">第八章 · 練習問題</div>
+    <h2 class="section-title">
+      手で書いて<br>
+      <span class="deco">確かめる</span>
+    </h2>
+    <p style="max-width: 760px;">
+      ここまで読んできた内容で、実は<strong>それなりの範囲のプログラムが自分で書ける</strong>ようになっている。
+      6 題、簡単なものから少し手応えのあるものまで並べる。
+      <strong>まずは紙かエディタで自分で書いてみてほしい</strong>。
+      書けたら第七章のシミュレータに貼り付けて Run、あるいは実機で <code>clang -o</code> して実行し、答え合わせをする。
+      それでも詰まったら「ヒント」を、それでもダメなら「正答を見る」をクリック。
+    </p>
+    <p class="hint">
+      ほとんどの問題は、関数 1 つを書く形式になっている。<strong>入力は <code>x0</code>、(あれば) <code>x1</code> から受け取り、答えを <code>x0</code> に入れて <code>ret</code> で返す</strong>のが標準の決まり。これは AAPCS64 の規則そのものなので、以後 asm で関数を書くたびに使うことになる。
+    </p>
+
+    <div class="ex-list">
+
+      <!-- =========== Exercise 1 =========== -->
+      <article class="ex-card">
+        <span class="ex-num">No. 01</span>
+        <span class="ex-difficulty d1">★ やさしい</span>
+        <h3>倍にする</h3>
+        <div class="ex-body">
+          <p>関数 <code>doubled(x)</code> を AArch64 アセンブリで書け。引数 <code>x</code> (x0) を 2 倍した値を返す。シミュレータで <code>mov x0, #21</code> から始めて、42 が戻り値になれば正解。</p>
+          <p>条件: 使える命令は <code>add</code>, <code>lsl</code>, <code>mov</code>, <code>ret</code> のどれでも OK。<strong>できれば 2 通り以上の書き方を試してみてほしい</strong>。</p>
+        </div>
+
+        <div class="ex-hint">
+          <div class="hint-label">ヒント</div>
+          2x は「x + x」と考えてもよいし、「x を 1 ビット左シフト」とも考えられる (2 進数で見ると、左シフトは 2 倍)。<code>lsl</code> (logical shift left) は <code>lsl Xd, Xn, #sh</code> の形。
+        </div>
+
+        <details class="ex-solution">
+          <summary>正答を見る</summary>
+          <div class="ex-solution-body">
+            <h4>解法 A · 自分自身を足す</h4>
+<pre class="code">    <span class="k">mov</span>   <span class="r">x0</span>, <span class="n">#21</span>        <span class="c">// 入力のセットアップ (動作確認用)</span>
+<span class="l">doubled:</span>
+    <span class="k">add</span>   <span class="r">x0</span>, <span class="r">x0</span>, <span class="r">x0</span>   <span class="c">// x0 = x0 + x0</span>
+    <span class="k">ret</span></pre>
+
+            <h4>解法 B · 左シフト</h4>
+<pre class="code">    <span class="k">mov</span>   <span class="r">x0</span>, <span class="n">#21</span>
+<span class="l">doubled:</span>
+    <span class="k">lsl</span>   <span class="r">x0</span>, <span class="r">x0</span>, <span class="n">#1</span>    <span class="c">// x0 = x0 &lt;&lt; 1 = x0 * 2</span>
+    <span class="k">ret</span></pre>
+
+            <div class="ex-explain">
+              どちらも 1 命令。コンパイラは状況に応じて使い分けるが、意味は同じ。<strong>左シフト 1 回分 = 2 倍、n 回 = 2<sup>n</sup> 倍</strong>という性質は以降よく出てくるので頭の隅に。
+            </div>
+          </div>
+        </details>
+      </article>
+
+      <!-- =========== Exercise 2 =========== -->
+      <article class="ex-card">
+        <span class="ex-num">No. 02</span>
+        <span class="ex-difficulty d1">★ やさしい</span>
+        <h3>偶数か奇数か</h3>
+        <div class="ex-body">
+          <p>関数 <code>is_odd(x)</code> を書け。<code>x</code> が奇数なら 1、偶数なら 0 を返す。例: <code>is_odd(7) = 1</code>、<code>is_odd(10) = 0</code>。</p>
+          <p>分岐を<strong>使わず</strong>に 2 命令以内で書くのが理想。</p>
+        </div>
+
+        <div class="ex-hint">
+          <div class="hint-label">ヒント</div>
+          2 進数で「偶数か奇数か」は<strong>最下位ビットを見るだけ</strong>で分かる。最下位ビットが <code>0</code> なら偶数、<code>1</code> なら奇数 (10 進でも「1 の位が偶数か奇数か」で判断するのと同じ要領)。<br>
+          ビットごとの AND を取ってその 1 ビットだけ残すには、<code>and Xd, Xn, #1</code> を使えばよい (マスク操作)。
+        </div>
+
+        <details class="ex-solution">
+          <summary>正答を見る</summary>
+          <div class="ex-solution-body">
+            <h4>正答</h4>
+<pre class="code">    <span class="k">mov</span>   <span class="r">x0</span>, <span class="n">#7</span>        <span class="c">// 動作確認用: 7 は奇数なので 1 を期待</span>
+<span class="l">is_odd:</span>
+    <span class="k">and</span>   <span class="r">x0</span>, <span class="r">x0</span>, <span class="n">#1</span>   <span class="c">// 最下位ビットだけ残して他を 0 に</span>
+    <span class="k">ret</span></pre>
+
+            <div class="ex-explain">
+              <code>and</code> で <code>x0</code> の全 64 ビットのうち最下位 1 ビットだけ残し、他を 0 にしている。結果として最下位が 1 (奇数) なら 1、0 (偶数) なら 0 が <code>x0</code> に入る。<strong>分岐一切なしで判定できる</strong>のがこの手の「ビット演算による条件計算」の美しさ。
+            </div>
+          </div>
+        </details>
+      </article>
+
+      <!-- =========== Exercise 3 =========== -->
+      <article class="ex-card">
+        <span class="ex-num">No. 03</span>
+        <span class="ex-difficulty d2">★★ ふつう</span>
+        <h3>フィボナッチ</h3>
+        <div class="ex-body">
+          <p>関数 <code>fib(n)</code> を書け。入力 <code>n</code> (x0) に対して、n 番目のフィボナッチ数を返す。</p>
+          <p>数列の定義: <code>fib(0) = 0</code>, <code>fib(1) = 1</code>, <code>fib(n) = fib(n-1) + fib(n-2)</code>。例: <code>fib(10) = 55</code>。</p>
+          <p>条件: <strong>再帰は使わない</strong>。ループで書く (再帰は関数呼び出しが入って難易度が跳ね上がる)。</p>
+        </div>
+
+        <div class="ex-hint">
+          <div class="hint-label">ヒント</div>
+          3 本のレジスタで十分。前の値 <code>a</code> と現在の値 <code>b</code> を保持して、毎ループで <code>(a, b) → (b, a+b)</code> と更新していく。<br>
+          <strong>注意: 値の入れ替えをするときは一時レジスタが必要</strong>。<code>a = b; b = a + b;</code> を素直に書くと <code>b</code> が壊れるので、<code>tmp = a + b; a = b; b = tmp;</code> のような順で書く。<br>
+          ループの継続判定には <code>cbz</code> (zero なら分岐) と <code>sub</code> (カウンタを 1 減らす) が便利。
+        </div>
+
+        <details class="ex-solution">
+          <summary>正答を見る</summary>
+          <div class="ex-solution-body">
+            <h4>正答</h4>
+<pre class="code">    <span class="k">mov</span>   <span class="r">x0</span>, <span class="n">#10</span>       <span class="c">// 動作確認用: fib(10) は 55</span>
+<span class="l">fib:</span>
+    <span class="k">mov</span>   <span class="r">x1</span>, <span class="n">#0</span>        <span class="c">// a = 0  (= fib(0))</span>
+    <span class="k">mov</span>   <span class="r">x2</span>, <span class="n">#1</span>        <span class="c">// b = 1  (= fib(1))</span>
+<span class="l">Lloop:</span>
+    <span class="k">cbz</span>   <span class="r">x0</span>, <span class="l">Ldone</span>    <span class="c">// n == 0 なら終了</span>
+    <span class="k">add</span>   <span class="r">x3</span>, <span class="r">x1</span>, <span class="r">x2</span>   <span class="c">// tmp = a + b</span>
+    <span class="k">mov</span>   <span class="r">x1</span>, <span class="r">x2</span>        <span class="c">// a = b</span>
+    <span class="k">mov</span>   <span class="r">x2</span>, <span class="r">x3</span>        <span class="c">// b = tmp</span>
+    <span class="k">sub</span>   <span class="r">x0</span>, <span class="r">x0</span>, <span class="n">#1</span>   <span class="c">// n -= 1</span>
+    <span class="k">b</span>     <span class="l">Lloop</span>
+<span class="l">Ldone:</span>
+    <span class="k">mov</span>   <span class="r">x0</span>, <span class="r">x1</span>        <span class="c">// 返り値は a</span>
+    <span class="k">ret</span></pre>
+
+            <div class="ex-explain">
+              ループ回数 = 引数 <code>n</code> の値。毎回 (a, b) を 1 つ先に進め、n 回進んだあとの a が答え。<br>
+              ポイント: <strong>入力 n は x0 に入るが、ループカウンタとしてそのまま使って問題ない</strong> (消費しながら減らしていく)。最後に答えを <code>x0</code> に入れ直して ret。ループカウンタと戻り値レジスタが同じというのは asm の面白さ。
+            </div>
+          </div>
+        </details>
+      </article>
+
+      <!-- =========== Exercise 4 =========== -->
+      <article class="ex-card">
+        <span class="ex-num">No. 04</span>
+        <span class="ex-difficulty d2">★★ ふつう</span>
+        <h3>絶対値</h3>
+        <div class="ex-body">
+          <p>関数 <code>my_abs(x)</code> を書け。<code>x</code> の絶対値を返す。例: <code>my_abs(-7) = 7</code>, <code>my_abs(5) = 5</code>。</p>
+          <p><strong>葉関数として書くこと</strong>。つまり <code>stp</code> / <code>ldp</code> のプロローグ・エピローグを<strong>書かない</strong>。</p>
+        </div>
+
+        <div class="ex-hint">
+          <div class="hint-label">ヒント</div>
+          ゼロとの比較 (<code>cmp x0, #0</code>) でフラグを立て、負なら <code>neg</code> で符号反転。正ならそのまま。<br>
+          <code>b.ge</code> (greater or equal = Z=1 または N=V) を使うと「0 以上なら飛ぶ」条件分岐になる。
+        </div>
+
+        <details class="ex-solution">
+          <summary>正答を見る</summary>
+          <div class="ex-solution-body">
+            <h4>正答</h4>
+<pre class="code">    <span class="k">mov</span>   <span class="r">x0</span>, <span class="n">#-7</span>       <span class="c">// 動作確認用: -7 の絶対値は 7</span>
+<span class="l">my_abs:</span>
+    <span class="k">cmp</span>   <span class="r">x0</span>, <span class="n">#0</span>
+    <span class="k">b.ge</span>  <span class="l">Lpos</span>         <span class="c">// x0 >= 0 ならそのまま返す</span>
+    <span class="k">neg</span>   <span class="r">x0</span>, <span class="r">x0</span>        <span class="c">// 負なら符号反転</span>
+<span class="l">Lpos:</span>
+    <span class="k">ret</span></pre>
+
+            <div class="ex-explain">
+              葉関数 (他の関数を呼ばない関数) なので <code>x30</code> を壊す心配がなく、プロローグ/エピローグは不要。<strong>プロローグを省けるのは「自分が bl を使わない」ときだけ</strong>。
+            </div>
+          </div>
+        </details>
+      </article>
+
+      <!-- =========== Exercise 5 =========== -->
+      <article class="ex-card">
+        <span class="ex-num">No. 05</span>
+        <span class="ex-difficulty d3">★★★ しっかり考える</span>
+        <h3>配列の合計</h3>
+        <div class="ex-body">
+          <p>関数 <code>sum_array(ptr, n)</code> を書け。引数 <code>ptr</code> (x0) は 64 ビット整数の配列の先頭アドレス、<code>n</code> (x1) は要素数。<strong>全要素の合計を返す</strong>。</p>
+          <p>ポイント: メモリからのロードと、アドレスを進めながらのループが要る。</p>
+          <p><strong>シミュレータで試すには</strong>、先に <code>str</code> で適当な値を何個か置いてから <code>sum_array</code> を呼び出す形にするとよい (シミュレータ例題「メモリ書き込み」を参考に)。</p>
+        </div>
+
+        <div class="ex-hint">
+          <div class="hint-label">ヒント</div>
+          <ul class="field-list" style="margin-top: 0.3rem;">
+            <li><code>ldr x3, [x0]</code> で「x0 が指すアドレスから 8 バイト読み込んで x3 に」</li>
+            <li>アドレスを 8 バイト進めるには <code>add x0, x0, #8</code> (64 ビット整数 1 個分 = 8 バイト)</li>
+            <li>累積和を <code>x2</code> など別のレジスタに貯めると分かりやすい</li>
+            <li>ループ終了判定は <code>cbz x1, ...</code> (残り要素数が 0 になったら抜ける)</li>
+          </ul>
+        </div>
+
+        <details class="ex-solution">
+          <summary>正答を見る</summary>
+          <div class="ex-solution-body">
+            <h4>正答</h4>
+<pre class="code"><span class="c">// シミュレータで試すための準備 (3要素の配列を 0x1000 に置く)</span>
+    <span class="k">mov</span>   <span class="r">x10</span>, <span class="n">#0x1000</span>
+    <span class="k">mov</span>   <span class="r">x11</span>, <span class="n">#10</span>
+    <span class="k">str</span>   <span class="r">x11</span>, [<span class="r">x10</span>]
+    <span class="k">mov</span>   <span class="r">x11</span>, <span class="n">#20</span>
+    <span class="k">str</span>   <span class="r">x11</span>, [<span class="r">x10</span>, <span class="n">#8</span>]
+    <span class="k">mov</span>   <span class="r">x11</span>, <span class="n">#30</span>
+    <span class="k">str</span>   <span class="r">x11</span>, [<span class="r">x10</span>, <span class="n">#16</span>]
+
+    <span class="k">mov</span>   <span class="r">x0</span>, <span class="r">x10</span>       <span class="c">// ptr = 0x1000</span>
+    <span class="k">mov</span>   <span class="r">x1</span>, <span class="n">#3</span>         <span class="c">// n = 3</span>
+
+<span class="l">sum_array:</span>
+    <span class="k">mov</span>   <span class="r">x2</span>, <span class="n">#0</span>         <span class="c">// accumulator = 0</span>
+<span class="l">Lloop:</span>
+    <span class="k">cbz</span>   <span class="r">x1</span>, <span class="l">Ldone</span>     <span class="c">// n == 0 なら終了</span>
+    <span class="k">ldr</span>   <span class="r">x3</span>, [<span class="r">x0</span>]      <span class="c">// x3 = *ptr</span>
+    <span class="k">add</span>   <span class="r">x2</span>, <span class="r">x2</span>, <span class="r">x3</span>    <span class="c">// acc += *ptr</span>
+    <span class="k">add</span>   <span class="r">x0</span>, <span class="r">x0</span>, <span class="n">#8</span>    <span class="c">// ptr += 1  (1 要素 = 8 バイト)</span>
+    <span class="k">sub</span>   <span class="r">x1</span>, <span class="r">x1</span>, <span class="n">#1</span>    <span class="c">// n -= 1</span>
+    <span class="k">b</span>     <span class="l">Lloop</span>
+<span class="l">Ldone:</span>
+    <span class="k">mov</span>   <span class="r">x0</span>, <span class="r">x2</span>         <span class="c">// 答えを戻り値レジスタへ</span>
+    <span class="k">ret</span>                   <span class="c">// 結果: 10 + 20 + 30 = 60</span></pre>
+
+            <div class="ex-explain">
+              <strong>アドレスもレジスタで扱う値のひとつ</strong>というのが腑に落ちる問題。「配列を走査する」とは、要するに「アドレスを足し算で進める」こと。<br>
+              ポインタ型と整数型が機械語レベルでは同じ 64 ビット値であるという事実が、ここで体験できる。
+            </div>
+          </div>
+        </details>
+      </article>
+
+      <!-- =========== Exercise 6 =========== -->
+      <article class="ex-card">
+        <span class="ex-num">No. 06</span>
+        <span class="ex-difficulty d4">★★★★ 総合</span>
+        <h3>FizzBuzz</h3>
+        <div class="ex-body">
+          <p>1 から 15 までの数について:</p>
+          <ul class="field-list" style="margin-top: 0.2rem;">
+            <li>3 の倍数なら "Fizz"</li>
+            <li>5 の倍数なら "Buzz"</li>
+            <li>両方の倍数 (15 の倍数) なら "FizzBuzz"</li>
+            <li>どれでもない数字ならその数字自体</li>
+          </ul>
+          <p>を出力するプログラムを書け。これまでに出てきた要素の<strong>ほぼ全て</strong>を使う: プロローグ/エピローグ、ループ、条件分岐、<code>printf</code> の呼び出し、<code>adrp</code>/<code>add</code> の 2 段アドレス構築。</p>
+          <p>ヒント多めなので、まずは「1 から 15 まで数字をそのまま出力する」部分だけ書いて動かし、それから Fizz/Buzz の判定を足していくとよい。</p>
+        </div>
+
+        <div class="ex-hint">
+          <div class="hint-label">ヒント</div>
+          <ul class="field-list" style="margin-top: 0.3rem;">
+            <li>「3 の倍数」の判定には除算の剰余がほしい。AArch64 には直接の剰余命令がないが、<code>udiv</code> で商を計算し、<code>a - (a/b)*b</code> で剰余を作れる。<strong>msub</strong> という命令がこれを 1 命令でやってくれる: <code>msub Xd, Xn, Xm, Xa</code> は <code>Xd = Xa - (Xn * Xm)</code>。</li>
+            <li>剰余が 0 かどうかは <code>cbz</code> で判定できる。</li>
+            <li>x30 (戻り先アドレス) は printf を呼ぶたびに壊されるので、プロローグで退避する。</li>
+            <li>ループカウンタ (1 から 15 まで) は x19 など <strong>callee-saved レジスタ</strong>に入れておくと、printf 呼び出しをまたいでも保持される。x19 を使うなら、プロローグで退避する必要がある (C 関数のお作法)。</li>
+            <li>数字を出力するときは <code>printf("%ld\n", n)</code>、文字列を出力するときは <code>printf("%s\n", "Fizz")</code> または単に <code>puts("Fizz")</code>。</li>
+          </ul>
+        </div>
+
+        <details class="ex-solution">
+          <summary>正答を見る</summary>
+          <div class="ex-solution-body">
+            <h4>正答 · fizzbuzz.s</h4>
+<pre class="code">.global _main
+.align 2
+
+<span class="l">_main:</span>
+    <span class="k">stp</span>   <span class="r">x29</span>, <span class="r">x30</span>, [<span class="r">sp</span>, <span class="n">#-32</span>]!   <span class="c">// フレーム確保 (16+16 = 32 バイト)</span>
+    <span class="k">stp</span>   <span class="r">x19</span>, <span class="r">x20</span>, [<span class="r">sp</span>, <span class="n">#16</span>]     <span class="c">// x19, x20 も退避 (callee-saved)</span>
+    <span class="k">mov</span>   <span class="r">x29</span>, <span class="r">sp</span>
+
+    <span class="k">mov</span>   <span class="r">x19</span>, <span class="n">#1</span>                <span class="c">// カウンタ i = 1</span>
+<span class="l">Lloop:</span>
+    <span class="k">cmp</span>   <span class="r">x19</span>, <span class="n">#15</span>
+    <span class="k">b.gt</span>  <span class="l">Ldone</span>                   <span class="c">// i > 15 なら終了</span>
+
+    <span class="c">// i % 15 を計算 (FizzBuzz 判定)</span>
+    <span class="k">mov</span>   <span class="r">x20</span>, <span class="n">#15</span>
+    <span class="k">udiv</span>  <span class="r">x1</span>, <span class="r">x19</span>, <span class="r">x20</span>         <span class="c">// x1 = i / 15</span>
+    <span class="k">msub</span>  <span class="r">x1</span>, <span class="r">x1</span>, <span class="r">x20</span>, <span class="r">x19</span>     <span class="c">// x1 = i - (i/15)*15 = i % 15</span>
+    <span class="k">cbz</span>   <span class="r">x1</span>, <span class="l">Lfizzbuzz</span>
+
+    <span class="c">// i % 3 == 0 か</span>
+    <span class="k">mov</span>   <span class="r">x20</span>, <span class="n">#3</span>
+    <span class="k">udiv</span>  <span class="r">x1</span>, <span class="r">x19</span>, <span class="r">x20</span>
+    <span class="k">msub</span>  <span class="r">x1</span>, <span class="r">x1</span>, <span class="r">x20</span>, <span class="r">x19</span>
+    <span class="k">cbz</span>   <span class="r">x1</span>, <span class="l">Lfizz</span>
+
+    <span class="c">// i % 5 == 0 か</span>
+    <span class="k">mov</span>   <span class="r">x20</span>, <span class="n">#5</span>
+    <span class="k">udiv</span>  <span class="r">x1</span>, <span class="r">x19</span>, <span class="r">x20</span>
+    <span class="k">msub</span>  <span class="r">x1</span>, <span class="r">x1</span>, <span class="r">x20</span>, <span class="r">x19</span>
+    <span class="k">cbz</span>   <span class="r">x1</span>, <span class="l">Lbuzz</span>
+
+    <span class="c">// どれでもない: 数字そのものを出力</span>
+    <span class="k">adrp</span>  <span class="r">x0</span>, fmt_num@PAGE
+    <span class="k">add</span>   <span class="r">x0</span>, <span class="r">x0</span>, fmt_num@PAGEOFF
+    <span class="k">mov</span>   <span class="r">x1</span>, <span class="r">x19</span>
+    <span class="k">bl</span>    _printf
+    <span class="k">b</span>     <span class="l">Lnext</span>
+
+<span class="l">Lfizz:</span>
+    <span class="k">adrp</span>  <span class="r">x0</span>, s_fizz@PAGE
+    <span class="k">add</span>   <span class="r">x0</span>, <span class="r">x0</span>, s_fizz@PAGEOFF
+    <span class="k">bl</span>    _puts
+    <span class="k">b</span>     <span class="l">Lnext</span>
+
+<span class="l">Lbuzz:</span>
+    <span class="k">adrp</span>  <span class="r">x0</span>, s_buzz@PAGE
+    <span class="k">add</span>   <span class="r">x0</span>, <span class="r">x0</span>, s_buzz@PAGEOFF
+    <span class="k">bl</span>    _puts
+    <span class="k">b</span>     <span class="l">Lnext</span>
+
+<span class="l">Lfizzbuzz:</span>
+    <span class="k">adrp</span>  <span class="r">x0</span>, s_fb@PAGE
+    <span class="k">add</span>   <span class="r">x0</span>, <span class="r">x0</span>, s_fb@PAGEOFF
+    <span class="k">bl</span>    _puts
+
+<span class="l">Lnext:</span>
+    <span class="k">add</span>   <span class="r">x19</span>, <span class="r">x19</span>, <span class="n">#1</span>
+    <span class="k">b</span>     <span class="l">Lloop</span>
+
+<span class="l">Ldone:</span>
+    <span class="k">mov</span>   <span class="r">w0</span>, <span class="n">#0</span>
+    <span class="k">ldp</span>   <span class="r">x19</span>, <span class="r">x20</span>, [<span class="r">sp</span>, <span class="n">#16</span>]
+    <span class="k">ldp</span>   <span class="r">x29</span>, <span class="r">x30</span>, [<span class="r">sp</span>], <span class="n">#32</span>
+    <span class="k">ret</span>
+
+.data
+<span class="l">fmt_num:</span> .asciz <span class="s">"%ld\n"</span>
+<span class="l">s_fizz:</span>  .asciz <span class="s">"Fizz"</span>
+<span class="l">s_buzz:</span>  .asciz <span class="s">"Buzz"</span>
+<span class="l">s_fb:</span>    .asciz <span class="s">"FizzBuzz"</span></pre>
+
+            <h4>ビルドと実行</h4>
+<pre class="code">clang -o fizzbuzz fizzbuzz.s &amp;&amp; ./fizzbuzz
+<span class="c"># 1
+# 2
+# Fizz
+# 4
+# Buzz
+# Fizz
+# 7
+# 8
+# Fizz
+# Buzz
+# 11
+# Fizz
+# 13
+# 14
+# FizzBuzz</span></pre>
+
+            <div class="ex-explain">
+              <strong>FizzBuzz は判定の順番が命</strong>。15 の倍数は 3 の倍数でもあり 5 の倍数でもあるので、<strong>先に 15 から判定する</strong>。この順序を間違えると、たとえば 15 が "Fizz" になってしまう。<br>
+              <code>msub</code> は「乗算した結果をもう一つの値から引く」を 1 命令でやる命令。剰余計算の常套句として覚えておくと便利。<br>
+              ループカウンタを <code>x19</code> (callee-saved) に置いたのは、<code>printf</code> 呼び出しで caller-saved レジスタ (x0-x18) が壊されても値が保持されるから。これをサボると、printf から戻ってきたときにカウンタの値が消えている、というバグになる。
+            </div>
+          </div>
+        </details>
+      </article>
+
+    </div>
+
+    <div class="callout" style="margin-top: 3rem;">
+      <div class="lead">書き終えた人へ</div>
+      6 問全部が自力で書けたら、もう AArch64 アセンブリの基本文法は手の中にある。次のステップは、<strong>自分が書いた C 関数を <code>clang -S -O0</code> と <code>-O2</code> で asm 出力して読み比べる</strong>こと。コンパイラがどう「自動的に」同じことをしているか、そして最適化で何がどう変わるかを観察するのが、機械語理解の最良のトレーニングになる。
+    </div>
+
+  </div>
+</section>
+
+<div class="ornament">· · · ✦ · · ·</div>
+
+<footer>
+  <div class="container">
+    <div class="colophon">
+      &ldquo;To understand a machine, you must learn to write to it in its own hand.&rdquo;
+    </div>
+    <div class="meta">
+      AArch64 · Apple Silicon · Darwin ABI · Rev. 2026.04
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   COPY BUTTONS
+============================================================ */
+document.querySelectorAll('[data-copy]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const code = btn.parentElement.querySelector('.code');
+    const text = code ? code.innerText : '';
+    navigator.clipboard.writeText(text).then(() => {
+      const prev = btn.textContent;
+      btn.textContent = 'Copied';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = prev; btn.classList.remove('copied'); }, 1400);
+    });
+  });
+});
+
+/* ============================================================
+   REGISTER GRID
+============================================================ */
+const REG_INFO = [
+  { name: 'X0',  role: 'Arg0 / Ret',    detail: '汎用レジスタの 0 番。呼び出し規約 (AAPCS64) では第 1 引数と戻り値に使われる。C 関数の printf(fmt, ...) を呼ぶときは X0 に第 1 引数（フォーマット文字列のアドレス）を置く。Darwin では syscall の戻り値としても使われる。' },
+  { name: 'X1',  role: 'Arg1',          detail: '第 2 引数。printf("%s", name) の name がここに入る。libc から戻ってきたときの破壊レジスタでもある。' },
+  { name: 'X2',  role: 'Arg2',          detail: '第 3 引数。write(fd, buf, len) なら len がここ。' },
+  { name: 'X3',  role: 'Arg3',          detail: '第 4 引数。' },
+  { name: 'X4',  role: 'Arg4',          detail: '第 5 引数。引数 8 個まではレジスタ渡し、それ以降はスタック渡しになる。' },
+  { name: 'X5',  role: 'Arg5',          detail: '第 6 引数。' },
+  { name: 'X6',  role: 'Arg6',          detail: '第 7 引数。' },
+  { name: 'X7',  role: 'Arg7',          detail: '第 8 引数。これより多い引数はスタックに積む。' },
+  { name: 'X8',  role: 'Indirect Ret',  detail: '「大きな戻り値」(構造体など) のための間接結果位置レジスタ。普段は一時変数として使える。' },
+  { name: 'X9',  role: 'Caller-saved',  detail: '一時レジスタ。呼び出し側が保存する責任を持つ。関数呼び出しをまたぐと値が失われる可能性がある。' },
+  { name: 'X10', role: 'Caller-saved',  detail: '一時レジスタ。X9 と同扱い。' },
+  { name: 'X11', role: 'Caller-saved',  detail: '一時レジスタ。' },
+  { name: 'X12', role: 'Caller-saved',  detail: '一時レジスタ。' },
+  { name: 'X13', role: 'Caller-saved',  detail: '一時レジスタ。' },
+  { name: 'X14', role: 'Caller-saved',  detail: '一時レジスタ。' },
+  { name: 'X15', role: 'Caller-saved',  detail: '一時レジスタ。X9〜X15 は自由に使えるが、関数呼び出しで失われる。' },
+  { name: 'X16', role: 'IP0 / Syscall#',detail: 'IP0 (Intra-Procedure-call scratch 0)。リンカがスタブで使う。Darwin では syscall 番号をここに置く慣習がある (例: SYS_write = 4)。' },
+  { name: 'X17', role: 'IP1',           detail: 'IP1 (Intra-Procedure-call scratch 1)。X16 と同様、リンカが長距離ジャンプのスタブで使う。' },
+  { name: 'X18', role: 'Platform',      detail: 'プラットフォーム予約。Apple では使用禁止 (OS が使う)。絶対に書いてはいけない。' },
+  { name: 'X19', role: 'Callee-saved',  detail: '被呼び出し側が保存するレジスタ。関数呼び出しをまたいで値が保持される。使うならプロローグで退避、エピローグで復帰する。' },
+  { name: 'X20', role: 'Callee-saved',  detail: '同上。長く生き残る値を入れるのに向く。' },
+  { name: 'X21', role: 'Callee-saved',  detail: '同上。' },
+  { name: 'X22', role: 'Callee-saved',  detail: '同上。' },
+  { name: 'X23', role: 'Callee-saved',  detail: '同上。' },
+  { name: 'X24', role: 'Callee-saved',  detail: '同上。' },
+  { name: 'X25', role: 'Callee-saved',  detail: '同上。' },
+  { name: 'X26', role: 'Callee-saved',  detail: '同上。' },
+  { name: 'X27', role: 'Callee-saved',  detail: '同上。' },
+  { name: 'X28', role: 'Callee-saved',  detail: 'X19〜X28 の 10 本は呼び出しをまたいで保持される。使うなら stp/ldp でスタックに退避する。' },
+  { name: 'X29', role: 'FP',            detail: 'フレームポインタ (FP)。現在のスタックフレームの基点。プロローグで stp x29, x30, [sp, #-16]! と退避し、mov x29, sp で再設定する。' },
+  { name: 'X30', role: 'LR',            detail: 'リンクレジスタ (LR)。bl (branch with link) が呼び出し元アドレスをここに書き込み、ret がここへ戻る。関数内で別の関数を呼ぶなら必ず退避すること。' },
+  { name: 'SP',  role: 'Stack Ptr',     detail: 'スタックポインタ。AArch64 では特別なレジスタで、16 バイト境界に揃っていないといけない (だから stp x29, x30, [sp, #-16]! のように 16 単位で動かす)。', kind: 'special' },
+  { name: 'PC',  role: 'Program Counter',detail: 'プログラムカウンタ。x86 と違って通常の命令では直接読み書きできない。分岐 (b, bl, br) を介して変わる。', kind: 'special' }
+];
+
+const regGrid = document.getElementById('reg-grid');
+const regDetail = document.getElementById('reg-detail');
+REG_INFO.forEach((r, i) => {
+  const cell = document.createElement('div');
+  cell.className = 'reg-cell';
+  if (r.kind) cell.dataset.kind = r.kind;
+  cell.innerHTML = `<span class="name">${r.name}</span><span class="role">${r.role}</span>`;
+  cell.addEventListener('click', () => {
+    document.querySelectorAll('.reg-cell').forEach(c => c.classList.remove('active'));
+    cell.classList.add('active');
+    regDetail.innerHTML = `
+      <h4>${r.name}</h4>
+      <div class="subtitle">${r.kind === 'special' ? 'Special Purpose' : 'General Purpose'} · ${r.role}</div>
+      <p>${r.detail}</p>`;
+  });
+  regGrid.appendChild(cell);
+});
+
+/* ============================================================
+   INSTRUCTION REFERENCE
+============================================================ */
+const INST = {
+  move: [
+    ['mov',   'Xd, #imm',          'Xd に即値を入れる (16bit 即値 + シフト)',  'レジスタを定数で初期化する最頻出命令。16 ビットを超える即値は複数命令に分解される。'],
+    ['mov',   'Xd, Xs',            'Xs の値を Xd にコピー',                   '実は orr Xd, xzr, Xs の略記。新しい箱にレジスタの値を移したいときに使う。'],
+    ['movz',  'Xd, #imm, LSL #s',  'Xd をゼロクリアしてから即値を書き込む',     '64bit の大きな定数を 16bit ごとに組み立てる用。普段は mov で十分。'],
+    ['movk',  'Xd, #imm, LSL #s',  '他部分を保持したまま即値を書き込む',        '大きな定数の 2 段目以降に使う。movz → movk → movk → movk で任意の 64bit 値を作れる。'],
+    ['adrp',  'Xd, label@PAGE',    'ラベルの所属するページ (4KB) の先頭アドレスを取得', '絶対アドレスを作る 2 段構えの 1 段目。PC 相対で ±4GB まで届く。'],
+    ['adr',   'Xd, label',         '近距離のラベルアドレスを PC 相対で取得 (±1MB)', '小さな範囲ならこれ 1 発で済む。adrp より狭いが単純。']
+  ],
+  arith: [
+    ['add',   'Xd, Xn, Xm',        'Xd = Xn + Xm',                            'レジスタ同士の加算。最も基本的な算術命令。'],
+    ['add',   'Xd, Xn, #imm',      'Xd = Xn + 即値 (12bit)',                   '定数を加える。ポインタ演算やインクリメントで頻出。'],
+    ['adds',  'Xd, Xn, Xm',        'add と同じだがフラグも更新する',             's サフィックスは set flags。計算と同時に条件判定したい時。'],
+    ['sub',   'Xd, Xn, Xm',        'Xd = Xn - Xm',                            '引き算。cmp は内部的に subs の結果捨て版。'],
+    ['sub',   'Xd, Xn, #imm',      'Xd = Xn - 即値',                           'スタックポインタを動かす時によく出る (sub sp, sp, #32)。'],
+    ['mul',   'Xd, Xn, Xm',        'Xd = Xn × Xm (下位 64bit)',                '掛け算。上位ビットの溢れは捨てられる (符号の区別不要)。'],
+    ['sdiv',  'Xd, Xn, Xm',        'Xd = Xn ÷ Xm (符号あり)',                  '整数除算。剰余は得られない (msub で別途計算)。'],
+    ['udiv',  'Xd, Xn, Xm',        'Xd = Xn ÷ Xm (符号なし)',                  '符号なし除算。'],
+    ['neg',   'Xd, Xn',            'Xd = -Xn',                                '符号反転。中身は sub Xd, xzr, Xn。']
+  ],
+  logic: [
+    ['and',   'Xd, Xn, Xm',        'Xd = Xn AND Xm',                          'ビットマスク。下位 N ビットだけ取り出す用途でよく使う。'],
+    ['orr',   'Xd, Xn, Xm',        'Xd = Xn OR  Xm',                          'ビットを立てる。mov は実はこれの特殊形。'],
+    ['eor',   'Xd, Xn, Xm',        'Xd = Xn XOR Xm (exclusive or)',           'レジスタ零クリア (eor xn, xn, xn) や swap のトリックに使う。'],
+    ['mvn',   'Xd, Xn',            'Xd = NOT Xn (全ビット反転)',                '~x を計算する。orn の特殊形。'],
+    ['lsl',   'Xd, Xn, #sh',       '論理左シフト (= × 2^sh)',                 '2 のべき乗倍を効率的に。lsl x0, x0, #3 なら x0 × 8。'],
+    ['lsr',   'Xd, Xn, #sh',       '論理右シフト (符号なし)',                   '符号なし除算 (÷ 2^sh)。上位に 0 を詰める。'],
+    ['asr',   'Xd, Xn, #sh',       '算術右シフト (符号拡張)',                   '符号あり除算 (÷ 2^sh)。上位に符号ビットを詰める。']
+  ],
+  mem: [
+    ['ldr',   'Xd, [Xn]',          'メモリ [Xn] から 8 バイトを Xd にロード',    'AArch64 では計算はレジスタ同士、メモリとの往来は ldr/str だけ (Load/Store アーキテクチャ)。'],
+    ['ldr',   'Xd, [Xn, #imm]',    '[Xn + imm] から 8 バイトをロード',           '構造体のフィールドアクセスに頻出。Xn をベース、imm をオフセットとして使う。'],
+    ['ldr',   'Wd, [Xn]',          '[Xn] から 4 バイトをロード (上位はゼロ)',    '32bit 値を読む時。上位 32bit は自動的に 0 になる。'],
+    ['ldrb',  'Wd, [Xn]',          '[Xn] から 1 バイト (符号なし) をロード',      '文字列処理で 1 文字ずつ読む時。'],
+    ['str',   'Xs, [Xn]',          'Xs の 8 バイトを [Xn] へストア',             'ロードの逆。引数の順番が ldr と同じ向き (dst が左) なので混乱しやすい。'],
+    ['str',   'Xs, [Xn, #imm]',    '[Xn + imm] へストア',                       '構造体への書き込み、配列要素への代入など。'],
+    ['stp',   'Xa, Xb, [Xn, #-16]!','ペアで 16 バイト一括ストア (プレ減算・書き戻し)', '関数プロローグの定型句 stp x29, x30, [sp, #-16]!。sp を 16 減らしてからストアし、sp を書き戻す。'],
+    ['ldp',   'Xa, Xb, [Xn], #16', 'ペアで 16 バイト一括ロード (ポスト加算)',     'エピローグの定型句。ロードしてから sp に 16 を足す。stp の逆操作。']
+  ],
+  cmp: [
+    ['cmp',   'Xn, Xm',            'Xn - Xm を計算して NZCV を更新 (結果は捨てる)', 'AArch64 では比較は 2 段階。まず cmp でフラグを立て、次の b.xx で飛ぶ。'],
+    ['cmp',   'Xn, #imm',          'Xn - 即値 を計算して NZCV を更新',            '定数との比較。if (i == 10) のような時。'],
+    ['cmn',   'Xn, Xm',            'Xn + Xm でフラグ更新 (負値との比較に便利)',     'cmp Xn, #-imm の代わりに cmn Xn, #imm。負の即値が書けない場合の回避。'],
+    ['tst',   'Xn, Xm',            'Xn AND Xm でフラグ更新 (ビット立っているかの確認)', 'ビットフラグ検査。ands の結果捨て版。']
+  ],
+  branch: [
+    ['b',     'label',             '無条件ジャンプ',                             'goto 相当。x30 を書き換えないので「戻ってこない」ジャンプ。'],
+    ['b.eq',  'label',             'Z=1 (前の cmp で等しい) なら分岐',            'if (a == b) の直後。'],
+    ['b.ne',  'label',             'Z=0 (等しくない) なら分岐',                  'if (a != b) の直後。while ループの条件判定で頻出。'],
+    ['b.lt',  'label',             'N≠V (符号あり小なり) なら分岐',               'if (a < b) 符号あり。'],
+    ['b.gt',  'label',             'Z=0 かつ N=V (符号あり大なり) なら分岐',       'if (a > b) 符号あり。for ループの終了条件など。'],
+    ['b.le',  'label',             '符号あり ≤ で分岐',                         'if (a <= b) 符号あり。'],
+    ['b.ge',  'label',             '符号あり ≥ で分岐',                         'if (a >= b) 符号あり。'],
+    ['b.hi',  'label',             '符号なし > で分岐',                         '符号なし比較。unsigned 同士の時。'],
+    ['b.lo',  'label',             '符号なし < で分岐',                         '符号なし比較。ポインタ比較でよく出る。'],
+    ['cbz',   'Xn, label',         'Xn == 0 なら分岐 (フラグ不要)',              'cmp なしで 1 命令で判定できる。if (p == NULL) などに便利。'],
+    ['cbnz',  'Xn, label',         'Xn != 0 なら分岐',                          'cbz の逆。ループ継続判定に使うことが多い。']
+  ],
+  call: [
+    ['bl',    'label',             'x30 (LR) に戻り先を入れて分岐 (関数呼び出し)',  'Branch with Link の略。C の関数呼び出しはこれ。呼ばれた側は ret で戻る。'],
+    ['blr',   'Xn',                '間接呼び出し (Xn に格納されたアドレスへ)',     '関数ポインタ経由の呼び出し。コールバックや仮想関数で。'],
+    ['ret',   '',                  'x30 (LR) の値に戻る (関数からの復帰)',        '関数の終わり。暗黙に x30 を使うが、ret x0 のように明示もできる。'],
+    ['br',    'Xn',                '間接ジャンプ (Xn のアドレスへ, LR 更新なし)',  'ジャンプテーブル (switch 文の実装) などで使う。'],
+    ['svc',   '#0x80',             'Supervisor Call (Darwin の syscall 入口)',   'CPU の特権モードを切り替えカーネルへ。syscall 番号は x16 に入れておく。']
+  ]
+};
+
+const instPanels = document.getElementById('inst-panels');
+Object.entries(INST).forEach(([cat, rows], i) => {
+  const panel = document.createElement('div');
+  panel.className = 'inst-panel' + (i === 0 ? ' active' : '');
+  panel.dataset.cat = cat;
+  let html = '<table class="inst-table"><thead><tr><th style="width:6rem;">ニーモニック</th><th style="width:15rem;">書き方</th><th style="width:18rem;">意味</th><th>使いどころ・補足</th></tr></thead><tbody>';
+  rows.forEach(r => {
+    const [m, s, d, note] = r;
+    html += `<tr><td class="mnem">${m}</td><td class="syn">${s}</td><td class="desc">${d}</td><td class="desc" style="color:var(--text-faint);font-size:0.85rem;">${note || ''}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  panel.innerHTML = html;
+  instPanels.appendChild(panel);
+});
+
+document.querySelectorAll('.inst-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.inst-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.inst-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`.inst-panel[data-cat="${btn.dataset.cat}"]`).classList.add('active');
+  });
+});
+
+/* ============================================================
+   SAMPLE TABS
+============================================================ */
+document.querySelectorAll('.sample-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.sample;
+    document.querySelectorAll('.sample-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.sample').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`.sample[data-sample="${key}"]`).classList.add('active');
+  });
+});
+
+/* ============================================================
+   SIMULATOR ── subset AArch64 interpreter
+============================================================ */
+const PRESETS = {
+  addloop: `// 1 から 10 までの合計を計算する
+// 結果は x0 に残る (答え: 55)
+//
+// 学ぶこと: レジスタでの計算・条件分岐 (cmp / b.gt)・ループ
+// x0 = 累積和, x1 = カウンタ, 毎ループで x1 を x0 に加え x1 を +1 する
+
+    mov   x0, #0        // 合計を 0 で初期化
+    mov   x1, #1        // カウンタを 1 から
+Lloop:
+    cmp   x1, #10       // x1 と 10 を比較してフラグを立てる
+    b.gt  Ldone         // x1 > 10 なら抜ける
+    add   x0, x0, x1    // 合計に x1 を加える
+    add   x1, x1, #1    // カウンタを +1
+    b     Lloop         // 無条件でループ先頭へ
+Ldone:
+    ret
+`,
+  fact: `// 5! = 5 x 4 x 3 x 2 x 1 を計算する (答え: 120)
+//
+// 学ぶこと: cbz で「ゼロなら飛ぶ」1 命令判定・mul で乗算
+// x0 = 結果, x1 = カウンタ。x1 が 0 になるまで x0 に掛け続ける
+
+    mov   x0, #1        // 結果を 1 で初期化 (掛け算の単位元)
+    mov   x1, #5        // カウンタ
+Lloop:
+    cbz   x1, Ldone     // x1 == 0 なら終了 (cmp + b.eq を 1 命令で)
+    mul   x0, x0, x1    // x0 *= x1
+    sub   x1, x1, #1    // カウンタを -1
+    b     Lloop
+Ldone:
+    ret
+`,
+  memory: `// メモリに値を書き込み、読み返して合計する
+// (x10 を 0x1000 というアドレスのベースとして使う)
+//
+// 学ぶこと: str でメモリへ書き込み・ldr で読み出す
+// AArch64 は計算とメモリアクセスが分離された Load/Store アーキテクチャ
+
+    mov   x10, #0x1000      // ベースアドレスを x10 に
+    mov   x1, #42
+    mov   x2, #99
+    str   x1, [x10]         // [0x1000] に 42 を書き込む (8 バイト)
+    str   x2, [x10, #8]     // [0x1008] に 99 を書き込む
+
+    ldr   x3, [x10]         // [0x1000] から読み出し → x3 = 42
+    ldr   x4, [x10, #8]     // [0x1008] から読み出し → x4 = 99
+    add   x0, x3, x4        // x0 = 42 + 99 = 141
+    ret
+`,
+  branch: `// 絶対値 |x1| を計算して x0 に返す (x1 = -7, 答え: 7)
+//
+// 学ぶこと: cmp → b.ge の 2 段構え・neg で符号反転
+// 負なら反転、正ならそのまま、どちらに行くかを分岐で選ぶ
+
+    mov   x1, #-7       // 入力値 (この場合は負)
+    cmp   x1, #0        // 0 と比較 (フラグを立てる)
+    b.ge  Lpos          // x1 >= 0 なら正なので何もしない
+    neg   x1, x1        // 負だったので符号反転 (x1 = -x1)
+Lpos:
+    mov   x0, x1        // 結果を戻り値レジスタへ
+    ret
+`,
+  swap: `// x0 と x1 の値を XOR トリックで交換する
+// 初期値: x0 = 11, x1 = 22 → 最終的に x0 = 22, x1 = 11
+//
+// 学ぶこと: eor (XOR) の性質 a^a=0, a^0=a を使うと
+// 一時変数なしで 2 つの値を交換できる (古典的トリック)
+
+    mov   x0, #11       // 入力 1
+    mov   x1, #22       // 入力 2
+
+    eor   x0, x0, x1    // x0 = x0 ^ x1   (= 11 ^ 22)
+    eor   x1, x0, x1    // x1 = (11^22) ^ 22 = 11  ← 元の x0!
+    eor   x0, x0, x1    // x0 = (11^22) ^ 11 = 22  ← 元の x1!
+    ret
+`
+};
+
+const MEM_BASE = 0x1000;
+
+class Simulator {
+  constructor() {
+    this.editor = document.getElementById('sim-editor');
+    this.viewer = document.getElementById('sim-viewer');
+    this.console = document.getElementById('sim-console');
+    this.regsList = document.getElementById('regs-list');
+    this.flagsRow = document.getElementById('flags-row');
+    this.memList = document.getElementById('mem-list');
+    this.reset();
+
+    document.getElementById('sim-run').onclick = () => this.run();
+    document.getElementById('sim-step').onclick = () => this.step();
+    document.getElementById('sim-reset').onclick = () => this.reset();
+    document.getElementById('sim-preset').onchange = (e) => this.loadPreset(e.target.value);
+
+    document.querySelectorAll('.sim-state-tab').forEach(t => {
+      t.onclick = () => {
+        document.querySelectorAll('.sim-state-tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.sim-state-panel').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        document.querySelector(`.sim-state-panel[data-panel="${t.dataset.panel}"]`).classList.add('active');
+      };
+    });
+
+    this.loadPreset('addloop');
+  }
+
+  loadPreset(key) {
+    this.editor.value = PRESETS[key] || '';
+    this.reset();
+  }
+
+  reset() {
+    this.regs = new BigInt64Array(32);           // X0..X30, SP at 31 (we use 31 for SP)
+    this.changed = new Set();
+    this.N = 0; this.Z = 0; this.C = 0; this.V = 0;
+    this.memory = new Map();
+    this.pc = 0;
+    this.halted = false;
+    this.parsed = null;
+    this.currentLine = -1;
+    this.showEditor();
+    this.log('ready.', 'info');
+    this.render();
+  }
+
+  showEditor() {
+    this.editor.style.display = '';
+    this.viewer.style.display = 'none';
+  }
+  showViewer() {
+    this.editor.style.display = 'none';
+    this.viewer.style.display = '';
+  }
+
+  log(msg, cls) {
+    const span = document.createElement('span');
+    if (cls) span.className = cls;
+    span.textContent = msg + '\n';
+    this.console.appendChild(span);
+    this.console.scrollTop = this.console.scrollHeight;
+  }
+
+  clearLog() { this.console.innerHTML = ''; }
+
+  /* ---------- PARSER ---------- */
+  parse(src) {
+    const lines = src.split('\n');
+    const insts = [];       // { raw, lineIdx, op, args }
+    const labels = new Map();
+    const lineMap = [];     // per line: index into insts, or -1
+
+    lines.forEach((line, i) => {
+      let l = line.replace(/\/\/.*/, '').replace(/;.*/, '').trim();
+      if (!l) { lineMap.push(-1); return; }
+      // labels (may be inline with instruction)
+      const m = l.match(/^([A-Za-z_.][\w.]*):\s*(.*)$/);
+      if (m) {
+        labels.set(m[1], insts.length);
+        l = m[2].trim();
+        if (!l) { lineMap.push(-1); return; }
+      }
+      // skip assembler directives (.global, .align, .data, .text, .asciz, etc.)
+      if (l.startsWith('.')) { lineMap.push(-1); return; }
+      const parts = l.split(/\s+/);
+      const op = parts[0].toLowerCase();
+      const rest = l.slice(parts[0].length).trim();
+      const args = this.splitArgs(rest);
+      lineMap.push(insts.length);
+      insts.push({ raw: line, lineIdx: i, op, args });
+    });
+
+    return { insts, labels, lineMap, lines };
+  }
+
+  splitArgs(s) {
+    // split by commas, but preserve [ ... ] groups
+    const out = [];
+    let cur = '';
+    let depth = 0;
+    for (const ch of s) {
+      if (ch === '[') depth++;
+      if (ch === ']') depth--;
+      if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out;
+  }
+
+  regIndex(name) {
+    name = name.toLowerCase();
+    if (name === 'sp') return 31;
+    if (name === 'xzr' || name === 'wzr') return -1;  // zero register
+    const m = name.match(/^[xw](\d+)$/);
+    if (!m) throw new Error(`unknown register: ${name}`);
+    const n = parseInt(m[1], 10);
+    if (n < 0 || n > 30) throw new Error(`register out of range: ${name}`);
+    return n;
+  }
+
+  readReg(name) {
+    const i = this.regIndex(name);
+    if (i < 0) return 0n;
+    let v = this.regs[i];
+    if (name.toLowerCase().startsWith('w')) {
+      v = BigInt.asUintN(32, v);
+    }
+    return v;
+  }
+
+  writeReg(name, val) {
+    const i = this.regIndex(name);
+    if (i < 0) return;
+    if (name.toLowerCase().startsWith('w')) {
+      val = BigInt.asUintN(32, val);
+    } else {
+      val = BigInt.asIntN(64, val);
+    }
+    this.regs[i] = val;
+    this.changed.add(i);
+  }
+
+  parseImm(s) {
+    s = s.trim();
+    if (!s.startsWith('#')) throw new Error(`expected immediate: ${s}`);
+    let v = s.slice(1).trim();
+    let neg = 1n;
+    if (v.startsWith('-')) { neg = -1n; v = v.slice(1); }
+    if (v.startsWith('+')) { v = v.slice(1); }
+    if (v.startsWith('0x') || v.startsWith('0X')) return neg * BigInt(v);
+    if (v.startsWith('0b') || v.startsWith('0B')) return neg * BigInt(v);
+    return neg * BigInt(v);
+  }
+
+  /* [Xn]  or  [Xn, #imm]  or  [Xn, #imm]! or [Xn], #imm */
+  parseMemOperand(s) {
+    s = s.trim();
+    let writeback = false, postIndex = false;
+    if (s.endsWith('!')) { writeback = true; s = s.slice(0, -1).trim(); }
+
+    // post-index "[Xn], #imm"
+    const post = s.match(/^\[\s*([^,\]\s]+)\s*\]\s*,\s*(#.+)$/);
+    if (post) {
+      return { base: post[1], offset: this.parseImm(post[2]), writeback: true, postIndex: true };
+    }
+
+    const m = s.match(/^\[\s*([^,\]\s]+)(?:\s*,\s*(#.+?))?\s*\]$/);
+    if (!m) throw new Error(`bad memory operand: ${s}`);
+    const base = m[1];
+    const offset = m[2] ? this.parseImm(m[2]) : 0n;
+    return { base, offset, writeback, postIndex: false };
+  }
+
+  setFlagsFromResult(result, operand1, operand2, isSub) {
+    // operate in signed 64-bit
+    const r64 = BigInt.asIntN(64, result);
+    this.N = r64 < 0n ? 1 : 0;
+    this.Z = r64 === 0n ? 1 : 0;
+    // carry / overflow (unsigned/signed)
+    const u1 = BigInt.asUintN(64, operand1);
+    const u2 = BigInt.asUintN(64, operand2);
+    if (isSub) {
+      // C = (unsigned) no borrow, i.e. u1 >= u2
+      this.C = u1 >= u2 ? 1 : 0;
+      const s1 = BigInt.asIntN(64, operand1);
+      const s2 = BigInt.asIntN(64, operand2);
+      const sr = BigInt.asIntN(64, s1 - s2);
+      // overflow: sign of (a) != sign of (b) && sign of (r) != sign of (a)
+      this.V = ((s1 < 0n) !== (s2 < 0n)) && ((sr < 0n) !== (s1 < 0n)) ? 1 : 0;
+    } else {
+      const sum = u1 + u2;
+      this.C = sum > ((1n << 64n) - 1n) ? 1 : 0;
+      const s1 = BigInt.asIntN(64, operand1);
+      const s2 = BigInt.asIntN(64, operand2);
+      const sr = BigInt.asIntN(64, s1 + s2);
+      this.V = ((s1 < 0n) === (s2 < 0n)) && ((sr < 0n) !== (s1 < 0n)) ? 1 : 0;
+    }
+  }
+
+  operandValue(arg) {
+    arg = arg.trim();
+    if (arg.startsWith('#')) return this.parseImm(arg);
+    return BigInt.asIntN(64, this.readReg(arg));
+  }
+
+  /* ---------- EXEC ---------- */
+  exec(inst) {
+    const { op, args } = inst;
+    switch (op) {
+      case 'mov':
+      case 'movz': {
+        const dst = args[0];
+        const val = this.operandValue(args[1]);
+        this.writeReg(dst, val);
+        break;
+      }
+      case 'movk': {
+        // simplified: just write low 16 bits, preserve upper
+        const dst = args[0];
+        const val = this.parseImm(args[1]);
+        const cur = this.readReg(dst);
+        const masked = BigInt.asIntN(64, (cur & ~0xFFFFn) | (val & 0xFFFFn));
+        this.writeReg(dst, masked);
+        break;
+      }
+      case 'add': {
+        const a = this.operandValue(args[1]);
+        const b = this.operandValue(args[2]);
+        this.writeReg(args[0], a + b);
+        break;
+      }
+      case 'adds': {
+        const a = this.operandValue(args[1]);
+        const b = this.operandValue(args[2]);
+        const r = a + b;
+        this.writeReg(args[0], r);
+        this.setFlagsFromResult(r, a, b, false);
+        break;
+      }
+      case 'sub': {
+        const a = this.operandValue(args[1]);
+        const b = this.operandValue(args[2]);
+        this.writeReg(args[0], a - b);
+        break;
+      }
+      case 'subs': {
+        const a = this.operandValue(args[1]);
+        const b = this.operandValue(args[2]);
+        const r = a - b;
+        this.writeReg(args[0], r);
+        this.setFlagsFromResult(r, a, b, true);
+        break;
+      }
+      case 'mul': {
+        const a = this.operandValue(args[1]);
+        const b = this.operandValue(args[2]);
+        this.writeReg(args[0], BigInt.asIntN(64, a * b));
+        break;
+      }
+      case 'sdiv': {
+        const a = this.operandValue(args[1]);
+        const b = this.operandValue(args[2]);
+        if (b === 0n) throw new Error('divide by zero');
+        this.writeReg(args[0], BigInt.asIntN(64, a / b));
+        break;
+      }
+      case 'udiv': {
+        const a = BigInt.asUintN(64, this.operandValue(args[1]));
+        const b = BigInt.asUintN(64, this.operandValue(args[2]));
+        if (b === 0n) throw new Error('divide by zero');
+        this.writeReg(args[0], a / b);
+        break;
+      }
+      case 'neg': {
+        const a = this.operandValue(args[1]);
+        this.writeReg(args[0], -a);
+        break;
+      }
+      case 'and': {
+        const a = BigInt.asUintN(64, this.operandValue(args[1]));
+        const b = BigInt.asUintN(64, this.operandValue(args[2]));
+        this.writeReg(args[0], BigInt.asIntN(64, a & b));
+        break;
+      }
+      case 'orr': {
+        const a = BigInt.asUintN(64, this.operandValue(args[1]));
+        const b = BigInt.asUintN(64, this.operandValue(args[2]));
+        this.writeReg(args[0], BigInt.asIntN(64, a | b));
+        break;
+      }
+      case 'eor': {
+        const a = BigInt.asUintN(64, this.operandValue(args[1]));
+        const b = BigInt.asUintN(64, this.operandValue(args[2]));
+        this.writeReg(args[0], BigInt.asIntN(64, a ^ b));
+        break;
+      }
+      case 'mvn': {
+        const a = BigInt.asUintN(64, this.operandValue(args[1]));
+        this.writeReg(args[0], BigInt.asIntN(64, ~a & ((1n << 64n) - 1n)));
+        break;
+      }
+      case 'lsl': {
+        const a = BigInt.asUintN(64, this.operandValue(args[1]));
+        const s = this.parseImm(args[2]);
+        this.writeReg(args[0], BigInt.asIntN(64, (a << s) & ((1n << 64n) - 1n)));
+        break;
+      }
+      case 'lsr': {
+        const a = BigInt.asUintN(64, this.operandValue(args[1]));
+        const s = this.parseImm(args[2]);
+        this.writeReg(args[0], BigInt.asIntN(64, a >> s));
+        break;
+      }
+      case 'asr': {
+        const a = BigInt.asIntN(64, this.operandValue(args[1]));
+        const s = this.parseImm(args[2]);
+        this.writeReg(args[0], BigInt.asIntN(64, a >> s));
+        break;
+      }
+      case 'cmp': {
+        const a = this.operandValue(args[0]);
+        const b = this.operandValue(args[1]);
+        this.setFlagsFromResult(a - b, a, b, true);
+        break;
+      }
+      case 'cmn': {
+        const a = this.operandValue(args[0]);
+        const b = this.operandValue(args[1]);
+        this.setFlagsFromResult(a + b, a, b, false);
+        break;
+      }
+      case 'tst': {
+        const a = BigInt.asUintN(64, this.operandValue(args[0]));
+        const b = BigInt.asUintN(64, this.operandValue(args[1]));
+        const r = BigInt.asIntN(64, a & b);
+        this.N = r < 0n ? 1 : 0;
+        this.Z = r === 0n ? 1 : 0;
+        this.C = 0; this.V = 0;
+        break;
+      }
+      case 'b': {
+        return this.labelTarget(args[0]);
+      }
+      case 'b.eq': if (this.Z === 1) return this.labelTarget(args[0]); break;
+      case 'b.ne': if (this.Z === 0) return this.labelTarget(args[0]); break;
+      case 'b.lt': if (this.N !== this.V) return this.labelTarget(args[0]); break;
+      case 'b.gt': if (this.Z === 0 && this.N === this.V) return this.labelTarget(args[0]); break;
+      case 'b.le': if (this.Z === 1 || this.N !== this.V) return this.labelTarget(args[0]); break;
+      case 'b.ge': if (this.N === this.V) return this.labelTarget(args[0]); break;
+      case 'b.hi': if (this.C === 1 && this.Z === 0) return this.labelTarget(args[0]); break;
+      case 'b.lo': if (this.C === 0) return this.labelTarget(args[0]); break;
+      case 'b.hs': if (this.C === 1) return this.labelTarget(args[0]); break;
+      case 'b.ls': if (this.C === 0 || this.Z === 1) return this.labelTarget(args[0]); break;
+      case 'cbz':  if (this.operandValue(args[0]) === 0n) return this.labelTarget(args[1]); break;
+      case 'cbnz': if (this.operandValue(args[0]) !== 0n) return this.labelTarget(args[1]); break;
+      case 'bl': {
+        // store return address in X30 and jump
+        this.regs[30] = BigInt(this.pc + 1);
+        this.changed.add(30);
+        return this.labelTarget(args[0]);
+      }
+      case 'ret': {
+        this.halted = true;
+        this.log('ret : 実行終了 (simulator)', 'ok');
+        return;
+      }
+      case 'nop': break;
+      case 'ldr': {
+        const mo = this.parseMemOperand(args[1]);
+        const addr = BigInt.asUintN(64, this.readReg(mo.base)) + mo.offset;
+        const val = this.memRead(addr, 8);
+        this.writeReg(args[0], BigInt.asIntN(64, val));
+        if (mo.writeback) {
+          this.writeReg(mo.base, BigInt.asIntN(64, addr + (mo.postIndex ? 0n : 0n)));
+        }
+        break;
+      }
+      case 'str': {
+        const mo = this.parseMemOperand(args[1]);
+        const addr = BigInt.asUintN(64, this.readReg(mo.base)) + mo.offset;
+        this.memWrite(addr, 8, BigInt.asUintN(64, this.readReg(args[0])));
+        break;
+      }
+      case 'stp': {
+        const mo = this.parseMemOperand(args[2]);
+        let addr = BigInt.asUintN(64, this.readReg(mo.base)) + mo.offset;
+        this.memWrite(addr,      8, BigInt.asUintN(64, this.readReg(args[0])));
+        this.memWrite(addr + 8n, 8, BigInt.asUintN(64, this.readReg(args[1])));
+        if (mo.writeback) this.writeReg(mo.base, BigInt.asIntN(64, addr));
+        break;
+      }
+      case 'ldp': {
+        const mo = this.parseMemOperand(args[2]);
+        let addr = BigInt.asUintN(64, this.readReg(mo.base)) + (mo.postIndex ? 0n : mo.offset);
+        this.writeReg(args[0], BigInt.asIntN(64, this.memRead(addr,      8)));
+        this.writeReg(args[1], BigInt.asIntN(64, this.memRead(addr + 8n, 8)));
+        if (mo.writeback) this.writeReg(mo.base, BigInt.asIntN(64, addr + (mo.postIndex ? mo.offset : 0n)));
+        break;
+      }
+      case 'svc': {
+        // not implemented: just note it
+        this.log('svc : シミュレータでは未実装。実機で試してください', 'info');
+        this.halted = true;
+        return;
+      }
+      default:
+        throw new Error(`未実装の命令: ${op}`);
+    }
+    return null;
+  }
+
+  labelTarget(name) {
+    if (!this.parsed.labels.has(name)) {
+      throw new Error(`未定義のラベル: ${name}`);
+    }
+    return this.parsed.labels.get(name);
+  }
+
+  memRead(addr, size) {
+    // Align to 8-byte and read BigInt
+    const key = addr.toString();
+    if (this.memory.has(key)) return this.memory.get(key);
+    return 0n;
+  }
+
+  memWrite(addr, size, val) {
+    this.memory.set(addr.toString(), val);
+  }
+
+  /* ---------- DRIVER ---------- */
+  ensureParsed() {
+    if (!this.parsed) {
+      this.parsed = this.parse(this.editor.value);
+      this.renderViewer();
+      this.showViewer();
+    }
+  }
+
+  step() {
+    try {
+      this.ensureParsed();
+      if (this.halted || this.pc >= this.parsed.insts.length) {
+        this.halted = true;
+        this.log('プログラム終端', 'info');
+        this.render();
+        return;
+      }
+      this.changed.clear();
+      const inst = this.parsed.insts[this.pc];
+      this.currentLine = inst.lineIdx;
+      const jumpTo = this.exec(inst);
+      if (this.halted) { this.render(); return; }
+      this.pc = (jumpTo === null || jumpTo === undefined) ? this.pc + 1 : jumpTo;
+      this.render();
+    } catch (e) {
+      this.log('error: ' + e.message, 'err');
+      this.halted = true;
+      this.render();
+    }
+  }
+
+  run() {
+    this.reset();
+    this.clearLog();
+    this.ensureParsed();
+    let steps = 0;
+    try {
+      while (!this.halted && this.pc < this.parsed.insts.length) {
+        this.changed.clear();
+        const inst = this.parsed.insts[this.pc];
+        this.currentLine = inst.lineIdx;
+        const jumpTo = this.exec(inst);
+        this.pc = (jumpTo === null || jumpTo === undefined) ? this.pc + 1 : jumpTo;
+        steps++;
+        if (steps > 100000) throw new Error('ステップ数の上限に達しました (100000)。無限ループの可能性があります');
+      }
+      const x0 = this.regs[0];
+      const dec = BigInt.asIntN(64, x0).toString();
+      const hex = '0x' + BigInt.asUintN(64, x0).toString(16);
+      this.log(`実行完了 (${steps} ステップ)  ──  戻り値 X0 = ${dec}  (${hex})`, 'ok');
+    } catch (e) {
+      this.log('error: ' + e.message, 'err');
+    }
+    this.halted = true;
+    this.render();
+  }
+
+  /* ---------- RENDER ---------- */
+  renderViewer() {
+    const html = this.parsed.lines.map((line, i) => {
+      const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      return `<span class="line" data-line="${i}"><span class="gutter">${String(i + 1).padStart(3)}</span>${escaped || ' '}</span>`;
+    }).join('');
+    this.viewer.innerHTML = html;
+  }
+
+  render() {
+    // viewer current line
+    if (this.parsed) {
+      this.viewer.querySelectorAll('.line').forEach(el => el.classList.remove('current'));
+      if (this.currentLine >= 0) {
+        const el = this.viewer.querySelector(`.line[data-line="${this.currentLine}"]`);
+        if (el) { el.classList.add('current'); el.scrollIntoView({ block: 'nearest' }); }
+      }
+    }
+
+    // result banner (X0)
+    const banner = document.getElementById('result-banner');
+    if (banner) {
+      const hasExecuted = this.currentLine >= 0 || this.halted;
+      if (!hasExecuted) {
+        banner.className = 'result-banner idle';
+        banner.innerHTML = `<div class="rb-label">戻り値 · X0</div>
+          <div class="rb-row"><span class="rb-dec">Run を押すと結果がここに出ます</span></div>`;
+      } else {
+        const x0 = this.regs[0];
+        const hex = '0x' + BigInt.asUintN(64, x0).toString(16).padStart(16, '0');
+        const dec = BigInt.asIntN(64, x0).toString();
+        banner.className = 'result-banner';
+        banner.innerHTML = `<div class="rb-label">${this.halted ? '戻り値' : '現在値'} · X0</div>
+          <div class="rb-row">
+            <span class="rb-reg">X0 =</span>
+            <span class="rb-dec">${dec}</span>
+            <span class="rb-hex">${hex}</span>
+          </div>`;
+      }
+    }
+
+    // flags
+    const flags = [['N', this.N], ['Z', this.Z], ['C', this.C], ['V', this.V]];
+    this.flagsRow.innerHTML = flags.map(([n, v]) =>
+      `<div class="flag${v ? ' set' : ''}"><div class="fn">${n}</div><div class="fv">${v}</div></div>`
+    ).join('');
+
+    // registers
+    const rows = [];
+    for (let i = 0; i < 32; i++) {
+      const v = this.regs[i];
+      const uv = BigInt.asUintN(64, v);
+      if (v === 0n && !this.changed.has(i)) {
+        // show only non-zero or changed by default, but always show X0-X7 + SP + X29/X30
+        if (![0,1,2,3,4,5,6,7,29,30,31].includes(i)) continue;
+      }
+      const name = i === 31 ? 'SP' : 'X' + i;
+      const hex = '0x' + uv.toString(16).padStart(16, '0');
+      const dec = BigInt.asIntN(64, v).toString();
+      const cls = this.changed.has(i) ? 'reg-row changed' : 'reg-row';
+      rows.push(`<div class="${cls}"><span class="rn">${name}</span><span class="rv">${hex}</span><span class="rd">${dec}</span></div>`);
+    }
+    this.regsList.innerHTML = rows.join('');
+
+    // memory
+    if (this.memory.size === 0) {
+      this.memList.innerHTML = '<div class="mem-empty">メモリへの書き込みはまだありません。str / stp を実行すると、ここにアドレスと値が表示されます。</div>';
+    } else {
+      const keys = [...this.memory.keys()].map(k => BigInt(k)).sort((a, b) => a < b ? -1 : 1);
+      this.memList.innerHTML = keys.map(k => {
+        const v = this.memory.get(k.toString());
+        return `<div class="mem-row"><span class="maddr">0x${k.toString(16).padStart(8, '0')}</span><span class="mval">0x${v.toString(16).padStart(16, '0')}</span></div>`;
+      }).join('');
+    }
+  }
+}
+
+new Simulator();
+
+/* ============================================================
+   SCROLL REVEAL
+============================================================ */
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>
